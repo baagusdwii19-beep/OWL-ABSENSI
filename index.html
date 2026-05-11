@@ -1,0 +1,1966 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="OWL Absensi">
+<meta name="theme-color" content="#0ea5e9">
+<meta name="description" content="Sistem Absensi Karyawan OWL - GPS, Selfie, Gaji Otomatis">
+<title>OWL Absensi v2.1</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
+<script>
+// ══════════════════════════════════════════════════════
+// FIREBASE REST API — Simpel, tanpa SDK, pasti jalan
+// ══════════════════════════════════════════════════════
+const FB_BASE = 'https://owl-absensi-default-rtdb.asia-southeast1.firebasedatabase.app/owl';
+
+const FB = {
+  get: async (path) => {
+    try {
+      const r = await fetch(FB_BASE + '/' + path + '.json');
+      if(r.ok){ const d = await r.json(); return d; }
+      return null;
+    } catch(e){ console.warn('FB.get error:', path, e.message); return null; }
+  },
+
+  set: async (path, data) => {
+    try {
+      const r = await fetch(FB_BASE + '/' + path + '.json', {
+        method : 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body   : JSON.stringify(data)
+      });
+      if(r.ok){ console.log('✅ FB.set OK:', path); return true; }
+      console.warn('❌ FB.set FAIL:', path, r.status, await r.text());
+      return false;
+    } catch(e){ console.warn('❌ FB.set ERROR:', path, e.message); return false; }
+  },
+
+  del: async (path) => {
+    try {
+      await fetch(FB_BASE + '/' + path + '.json', {method:'DELETE'});
+      return true;
+    } catch(e){ return false; }
+  },
+
+  // Test koneksi Firebase
+  test: async () => {
+    try {
+      const r = await fetch(FB_BASE + '/initialized.json');
+      const d = await r.json();
+      console.log('🔥 Firebase test:', d);
+      return r.ok;
+    } catch(e){ console.warn('Firebase test FAIL:', e.message); return false; }
+  }
+};
+
+// Test koneksi saat halaman load
+window.addEventListener('load', ()=>{
+  FB.test().then(ok=>{
+    if(ok) console.log('✅ Firebase REST API siap!');
+    else   console.warn('❌ Firebase REST API gagal — cek koneksi/rules');
+  });
+});
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--b:#38bdf8;--bd:#0ea5e9;--bl:#e0f2fe;--bp:#f0f9ff;--tx:#0c4a6e;--mt:#64748b;--br:#bae6fd;--gr:#22c55e;--rd:#ef4444;--am:#f59e0b}
+html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6fd;-webkit-tap-highlight-color:transparent}
+.shell{max-width:480px;margin:0 auto;background:#fff;min-height:100vh;box-shadow:0 0 40px rgba(14,165,233,.18)}
+.hdr{background:var(--bd);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.logo{display:flex;align-items:center;gap:9px;color:#fff}
+.logo-ic{width:36px;height:36px;background:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px}
+.logo-nm{font-size:22px;font-weight:800;letter-spacing:3px}
+.logo-sb{font-size:9px;opacity:.8;letter-spacing:1px;margin-top:1px}
+.hdr-r{color:#fff;text-align:right}
+.hdr-r .ht{font-size:18px;font-weight:700}
+.hdr-r .hd{font-size:10px;opacity:.8}
+.nav{display:flex;background:var(--bl);border-bottom:2px solid var(--br);position:sticky;top:64px;z-index:49}
+.nb{flex:1;padding:9px 2px 7px;font-size:10px;font-weight:600;color:var(--mt);background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;transition:.15s;position:relative;min-width:0}
+.nb.on{color:var(--bd);background:#fff;border-bottom:2.5px solid var(--bd)}
+.nb i{font-size:18px}
+.nb span{font-size:9px;white-space:nowrap}
+.ndot{width:7px;height:7px;background:var(--rd);border-radius:50%;position:absolute;top:7px;right:calc(50% - 14px);border:1.5px solid var(--bl);display:none}
+.pg{display:none;padding:14px 14px 90px}
+.pg.on{display:block}
+.sec{font-size:13px;font-weight:700;color:var(--tx);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.card{background:var(--bp);border:1px solid var(--br);border-radius:14px;padding:13px;margin-bottom:12px}
+.bdg{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700}
+.bdg-b{background:var(--bl);color:#0369a1}.bdg-g{background:#dcfce7;color:#15803d}
+.bdg-r{background:#fee2e2;color:#dc2626}.bdg-a{background:#fef3c7;color:#b45309}
+.btn{width:100%;padding:13px;border:none;border-radius:13px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:.18s;margin-bottom:8px}
+.btn:active{transform:scale(.98)}.btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.btn-g{background:var(--gr);color:#fff}.btn-r{background:var(--rd);color:#fff}
+.btn-b{background:var(--bd);color:#fff}.btn-w{background:#fff;color:var(--bd);border:2px solid var(--bd)}
+.btn-sm{padding:8px 14px;font-size:12px;width:auto;border-radius:10px;margin-bottom:0}
+.cam-box{background:#1e2d3d;border-radius:16px;overflow:hidden;height:220px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;margin-bottom:12px;border:2px dashed #334155}
+.cam-box video,.cam-box canvas{width:100%;height:100%;object-fit:cover;display:none}
+.cam-ph{text-align:center;color:rgba(255,255,255,.5)}
+.cam-ph i{font-size:48px;display:block;margin-bottom:8px}.cam-ph p{font-size:13px}
+.cam-ov{position:absolute;bottom:0;left:0;right:0;padding:12px 16px;display:none;justify-content:space-between;align-items:center;background:linear-gradient(to top,rgba(0,0,0,.6),transparent)}
+.cbt{background:#fff;border:none;border-radius:50%;width:44px;height:44px;cursor:pointer;font-size:19px;display:flex;align-items:center;justify-content:center}
+.cbt.sh{width:58px;height:58px;background:var(--b);color:#fff;border:3px solid rgba(255,255,255,.5)}
+.cbt.re{background:rgba(255,255,255,.2);color:#fff;border:1.5px solid rgba(255,255,255,.7);font-size:12px;border-radius:20px;width:auto;padding:6px 14px;height:auto}
+.loc-row{background:var(--bp);border:1px solid var(--br);border-radius:12px;padding:11px 13px;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.loc-row i{font-size:22px;color:var(--bd);flex-shrink:0}
+.loc-txt{flex:1;min-width:0}.loc-txt .lb{font-size:10px;color:var(--mt)}
+.loc-txt .vl{font-size:12px;font-weight:600;color:var(--tx);word-break:break-all}
+.loc-btn{background:var(--bl);color:var(--bd);border:none;border-radius:9px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0}
+.st-row{display:flex;gap:8px;margin-bottom:12px}
+.st-box{flex:1;background:var(--bp);border:1px solid var(--br);border-radius:12px;padding:10px 8px;text-align:center}
+.st-box .sl{font-size:10px;color:var(--mt);margin-bottom:3px}
+.st-box .sv{font-size:15px;font-weight:800;color:var(--tx)}
+.ri{background:#fff;border:1px solid var(--br);border-radius:12px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.ri-ic{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.ri-ic.m{background:#dcfce7;color:#15803d}.ri-ic.k{background:#fee2e2;color:#dc2626}
+.ri-tx{flex:1;min-width:0}.ri-tx .rn{font-size:12px;font-weight:700}
+.ri-tx .rd{font-size:10px;color:var(--mt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ri-jm{font-size:14px;font-weight:800;color:var(--tx);white-space:nowrap}
+.ri-ft{width:36px;height:36px;border-radius:8px;object-fit:cover;border:1px solid var(--br);flex-shrink:0;cursor:pointer}
+.gsum{background:var(--bd);border-radius:16px;padding:18px;color:#fff;margin-bottom:14px}
+.gsum .gl{font-size:11px;opacity:.8;margin-bottom:4px}
+.gsum .gn{font-size:28px;font-weight:800;margin-bottom:6px}
+.gsum .gd{font-size:11px;opacity:.85}
+.gcard{background:var(--bp);border:1px solid var(--br);border-radius:14px;padding:14px;margin-bottom:12px}
+.gr-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--br)}
+.gr-row:last-child{border-bottom:none}
+.gr-row .grl{font-size:12px;color:var(--mt)}.gr-row .grv{font-size:12px;font-weight:700;color:var(--tx)}
+.noti{background:#fff;border:1px solid var(--br);border-radius:12px;padding:12px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px}
+.noti-ic{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.noti-ic.warn{background:#fef3c7;color:#b45309}.noti-ic.ok{background:#dcfce7;color:#15803d}.noti-ic.info{background:var(--bl);color:var(--bd)}
+.noti-tx .nt{font-size:12px;font-weight:700;color:var(--tx)}.noti-tx .nd{font-size:11px;color:var(--mt);margin-top:2px;line-height:1.4}
+.noti-tx .ntime{font-size:10px;color:var(--b);margin-top:3px;font-weight:600}
+.admin-stat{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px}
+.asc{background:var(--bp);border:1px solid var(--br);border-radius:13px;padding:13px;text-align:center}
+.asc .asl{font-size:10px;color:var(--mt);margin-bottom:4px}.asc .asv{font-size:24px;font-weight:800;color:var(--tx)}
+.emp-item{background:#fff;border:1px solid var(--br);border-radius:12px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.emp-av{width:40px;height:40px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0}
+.emp-tx{flex:1;min-width:0}.emp-tx .en{font-size:13px;font-weight:700}.emp-tx .ed{font-size:11px;color:var(--mt)}
+.ic-btn{border:none;border-radius:8px;padding:6px 9px;font-size:14px;cursor:pointer}
+.ic-btn.edit{background:var(--bl);color:var(--bd)}.ic-btn.del{background:#fee2e2;color:#dc2626}
+.tab-row{display:flex;gap:6px;margin-bottom:14px}
+.tab-btn{flex:1;padding:9px 4px;border:1.5px solid var(--br);border-radius:11px;font-size:10px;font-weight:700;background:#fff;color:var(--mt);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px}
+.tab-btn.on{background:var(--bl);color:var(--bd);border-color:var(--b)}
+.tbl-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--br)}
+.lp-tbl{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
+.lp-tbl th{background:var(--bl);color:#0369a1;padding:9px 7px;text-align:left;font-weight:700}
+.lp-tbl td{padding:9px 7px;border-bottom:1px solid var(--br);color:var(--tx);vertical-align:middle}
+.lp-tbl tr:last-child td{border-bottom:none}.lp-tbl tr:hover td{background:var(--bp)}
+.exp-row{display:flex;gap:8px;margin-top:12px}
+.exp-btn{flex:1;padding:11px;border:none;border-radius:11px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.exp-csv{background:#dcfce7;color:#15803d}.exp-pdf{background:#fee2e2;color:#dc2626}
+#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#e0f2fe,#bae6fd);padding:24px}
+.login-box{background:#fff;border-radius:24px;padding:28px 24px;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(14,165,233,.15)}
+.login-logo{text-align:center;margin-bottom:24px}
+.login-logo .li{font-size:52px}.login-logo .ln{font-size:32px;font-weight:800;color:var(--bd);letter-spacing:4px;margin:4px 0}
+.login-logo .ls{font-size:12px;color:var(--mt)}
+.flbl{font-size:12px;font-weight:700;color:var(--tx);margin-bottom:6px;display:block}
+.fin{width:100%;padding:12px 14px;border:1.5px solid var(--br);border-radius:11px;font-size:14px;color:var(--tx);background:#fff;outline:none;margin-bottom:12px;transition:.15s}
+.fin:focus{border-color:var(--b);box-shadow:0 0 0 3px rgba(56,189,248,.12)}
+.pw-wrap{position:relative;margin-bottom:12px}
+.pw-wrap .fin{margin-bottom:0;padding-right:44px}
+.pw-eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--mt);font-size:18px}
+.lerr{background:#fee2e2;color:#dc2626;border-radius:10px;padding:10px;font-size:12px;text-align:center;margin-bottom:12px;display:none;font-weight:600}
+.first-box{background:#fef3c7;border:1px solid #fde68a;border-radius:12px;padding:14px;margin-bottom:14px;display:none}
+.first-box .ft{font-size:13px;font-weight:800;color:#92400e;margin-bottom:5px}
+.first-box .fd{font-size:11px;color:#b45309;line-height:1.6}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:16px}
+.modal-bg.on{display:flex}
+.modal{background:#fff;border-radius:20px;padding:22px;width:100%;max-width:360px;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:16px;font-weight:800;margin-bottom:8px;color:var(--tx);text-align:center}
+.modal-ft{width:80px;height:80px;border-radius:14px;object-fit:cover;margin:0 auto 12px;display:block;border:3px solid var(--br)}
+.minfo{font-size:11px;color:var(--mt);margin-bottom:14px;line-height:1.7;background:var(--bp);border-radius:10px;padding:10px}
+.modal-acts{display:flex;gap:8px;margin-top:4px}
+.modal-acts button{flex:1;padding:12px;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer}
+.mc{background:var(--bp);color:var(--mt)}.mk{background:var(--b);color:#fff}
+.foto-prev{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:300;align-items:center;justify-content:center}
+.foto-prev.on{display:flex}
+.foto-prev img{max-width:95%;max-height:85vh;border-radius:12px}
+.foto-prev-x{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:50%;width:40px;height:40px;font-size:20px;cursor:pointer}
+.gaji-tot{margin-top:12px;padding:13px;background:var(--bp);border-radius:13px;border:1.5px solid var(--bd)}
+.gaji-tot .gtl{font-size:11px;color:var(--mt)}.gaji-tot .gtn{font-size:22px;font-weight:800;color:var(--bd)}
+.gaji-tot .gtd{font-size:10px;color:var(--mt)}
+.srch-in{width:100%;padding:10px 14px;border:1.5px solid var(--br);border-radius:11px;font-size:13px;color:var(--tx);background:#fff;outline:none;margin-bottom:12px}
+.srch-in:focus{border-color:var(--b)}
+.empty{text-align:center;padding:32px 16px;color:var(--mt)}
+.empty i{font-size:44px;display:block;margin-bottom:10px;opacity:.3}.empty p{font-size:13px}
+#install-banner{display:none;position:fixed;bottom:0;left:0;right:0;z-index:999;padding:12px 16px;background:#0ea5e9;align-items:center;gap:10px;box-shadow:0 -4px 20px rgba(0,0,0,.2)}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:#1e293b;color:#fff;padding:12px 22px;border-radius:14px;font-size:13px;font-weight:600;z-index:9999;transition:transform .3s;max-width:90vw;text-align:center;pointer-events:none}
+#toast.on{transform:translateX(-50%) translateY(0)}
+#toast.ok{background:#15803d}#toast.er{background:#dc2626}#toast.warn{background:#b45309}
+@media print{#login-screen,.hdr,.nav,.btn,.loc-btn,#camBox,.exp-row,#toast,#install-banner,.modal-bg{display:none!important}.pg{display:block!important;padding:0!important}.shell{box-shadow:none;max-width:100%}body{background:#fff}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="li">🦉</div>
+      <div class="ln">OWL</div>
+      <div class="ls">Sistem Absensi Karyawan</div>
+    </div>
+    <div class="first-box" id="first-box">
+      <div class="ft">🎉 Selamat Datang di OWL!</div>
+      <div class="fd">Akun Admin otomatis dibuat:<br>Username: <strong>admin</strong> &nbsp;·&nbsp; Password: <strong>admin123</strong><br><br>⚠️ Segera ganti password di menu Admin → Setting.</div>
+    </div>
+    <div class="lerr" id="lerr"></div>
+    <label class="flbl">Username</label>
+    <input type="text" class="fin" id="uname" placeholder="Masukkan username" autocomplete="username">
+    <label class="flbl">Password</label>
+    <div class="pw-wrap">
+      <input type="password" class="fin" id="upass" placeholder="Masukkan password" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="pw-eye" onclick="togglePw()"><i class="ti ti-eye" id="eye-ic"></i></button>
+    </div>
+    <button class="btn btn-b" onclick="doLogin()" style="margin-top:4px"><i class="ti ti-login"></i> Masuk</button>
+    <div style="text-align:center;margin-top:18px;padding-top:14px;border-top:1px solid var(--br)">
+      <div style="font-size:13px;margin-bottom:4px">🦉</div>
+      <div style="font-size:12px;font-weight:700;color:var(--bd)">OWL Absensi Karyawan</div>
+      <div style="font-size:10px;color:var(--mt);margin-top:3px">© 2025 GII-BOX · Hak Cipta Dilindungi</div>
+      <div style="font-size:10px;color:var(--mt);margin-top:2px">GPS · Foto Selfie · Kalkulasi Gaji Otomatis</div>
+      <div style="font-size:9px;color:var(--br);margin-top:4px;background:var(--bp);border-radius:6px;padding:4px 8px;display:inline-block">v1.0.0 · Sistem Absensi Digital</div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app-screen" style="display:none">
+<div class="shell">
+  <div class="hdr">
+    <div class="logo">
+      <div class="logo-ic">🦉</div>
+      <div><div class="logo-nm">OWL</div><div class="logo-sb" id="hdr-role">Karyawan</div></div>
+    </div>
+    <div class="hdr-r"><div class="ht" id="hdr-jam">--:--:--</div><div class="hd" id="hdr-tgl"></div></div>
+  </div>
+
+  <div class="nav">
+    <button class="nb on" onclick="gp('absen',this)"><i class="ti ti-fingerprint"></i><span>Absen</span></button>
+    <button class="nb" onclick="gp('riwayat',this)"><i class="ti ti-history"></i><span>Riwayat</span></button>
+    <button class="nb" onclick="gp('gaji',this)"><i class="ti ti-moneybag"></i><span>Gaji</span></button>
+    <button class="nb" onclick="gp('notif',this)"><i class="ti ti-bell"></i><span>Notif</span><span class="ndot" id="ndot"></span></button>
+    <button class="nb" onclick="gp('admin',this)" id="nb-admin" style="display:none"><i class="ti ti-settings"></i><span>Admin</span></button>
+    <button class="nb" onclick="doLogout()"><i class="ti ti-logout"></i><span>Keluar</span></button>
+  </div>
+
+  <!-- ABSEN -->
+  <div class="pg on" id="pg-absen">
+    <div class="card" style="display:flex;align-items:center;gap:12px">
+      <div class="emp-av" id="av" style="width:50px;height:50px;font-size:18px;background:var(--bd)">?</div>
+      <div style="flex:1">
+        <div style="font-size:16px;font-weight:800;color:var(--tx)" id="u-nama">-</div>
+        <div style="font-size:11px;color:var(--mt)" id="u-jab">-</div>
+        <span class="bdg bdg-b" id="u-id">-</span>
+      </div>
+      <div style="text-align:right"><div style="font-size:10px;color:var(--mt)">Status</div><span class="bdg bdg-g">Aktif</span></div>
+    </div>
+    <div class="st-row">
+      <div class="st-box"><div class="sl">⬆️ Masuk</div><div class="sv" id="s-masuk" style="color:var(--gr)">--:--</div></div>
+      <div class="st-box"><div class="sl">⬇️ Keluar</div><div class="sv" id="s-keluar" style="color:var(--rd)">--:--</div></div>
+      <div class="st-box"><div class="sl">⏱ Durasi</div><div class="sv" id="s-dur" style="font-size:12px">0j 0m</div></div>
+    </div>
+    <div class="cam-box" id="camBox" onclick="startCam()">
+      <video id="vid" autoplay playsinline muted></video>
+      <canvas id="cvs"></canvas>
+      <div class="cam-ph" id="camPh"><i class="ti ti-camera"></i><p>Ketuk untuk aktifkan kamera</p></div>
+      <div class="cam-ov" id="camOv">
+        <button class="cbt re" id="btnRe" onclick="retake(event)"><i class="ti ti-refresh"></i> Ulang</button>
+        <button class="cbt sh" id="btnSh" onclick="snap(event)"><i class="ti ti-camera"></i></button>
+        <div style="width:44px"></div>
+      </div>
+    </div>
+    <!-- Input file galeri (hidden) -->
+    <input type="file" id="foto-upload" accept="image/*" capture="user" style="display:none" onchange="handleFotoUpload(event)">
+    <div class="loc-row" id="loc-row">
+      <i class="ti ti-map-pin" style="color:var(--bd);font-size:22px;flex-shrink:0"></i>
+      <div class="loc-txt" style="flex:1;min-width:0">
+        <div class="lb">Lokasi GPS</div>
+        <div class="vl" id="locVal">Belum dideteksi</div>
+        <div id="locAlamat" style="font-size:10px;color:var(--mt);margin-top:2px;display:none"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+        <button class="loc-btn" onclick="getLoc()"><i class="ti ti-refresh" style="font-size:11px"></i> Deteksi</button>
+        <button class="loc-btn" id="btn-maps" onclick="bukaMaps()" style="display:none;background:#dcfce7;color:#15803d"><i class="ti ti-map" style="font-size:11px"></i> Maps</button>
+      </div>
+    </div>
+    <button class="btn btn-g" id="btnM" onclick="doAbsen('masuk')"><i class="ti ti-login"></i> Absen Masuk</button>
+    <button class="btn btn-r" id="btnK" onclick="doAbsen('keluar')" disabled><i class="ti ti-logout"></i> Absen Keluar</button>
+    <div style="text-align:center;font-size:10px;color:var(--mt);padding-top:2px"><i class="ti ti-shield-check" style="font-size:12px;vertical-align:-2px"></i> Data tersimpan permanen di HP ini · Tarif Rp <span id="info-tarif">12.500</span>/jam</div>
+  </div>
+
+  <!-- RIWAYAT -->
+  <div class="pg" id="pg-riwayat">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="sec" style="margin-bottom:0"><i class="ti ti-history"></i> Riwayat Absensi</div>
+      <select id="rw-filter" onchange="renderRiwayat()" style="padding:6px 10px;border:1px solid var(--br);border-radius:9px;font-size:11px;color:var(--tx);background:#fff;outline:none">
+        <option value="7">7 Hari</option><option value="30">30 Hari</option><option value="all">Semua</option>
+      </select>
+    </div>
+    <div id="rw-list"></div>
+  </div>
+
+  <!-- GAJI -->
+  <div class="pg" id="pg-gaji">
+    <div class="gsum">
+      <div class="gl">💰 Estimasi Gaji Bulan Ini</div>
+      <div class="gn" id="g-total">Rp 0</div>
+      <div class="gd" id="g-det">0 jam × Rp 12.500/jam</div>
+    </div>
+    <div class="gcard">
+      <div class="sec"><i class="ti ti-clock"></i> Rekap Jam Kerja</div>
+      <div class="gr-row"><span class="grl">Total Hari Kerja</span><span class="grv" id="g-hari">0 hari</span></div>
+      <div class="gr-row"><span class="grl">Total Jam Kerja</span><span class="grv" id="g-jam">0 jam</span></div>
+      <div class="gr-row"><span class="grl">Tarif Per Jam</span><span class="grv" id="g-tarif">Rp 12.500</span></div>
+      <div class="gr-row" style="border-top:2px solid var(--b);margin-top:6px;padding-top:10px">
+        <span class="grl" style="font-weight:800;color:var(--tx)">Total Gaji</span>
+        <span class="grv" style="color:var(--bd);font-size:16px" id="g-total2">Rp 0</span>
+      </div>
+    </div>
+    <div class="gcard">
+      <div class="sec"><i class="ti ti-calendar"></i> Rincian Per Minggu</div>
+      <div id="g-minggu"></div>
+    </div>
+  </div>
+
+  <!-- NOTIF -->
+  <div class="pg" id="pg-notif">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="sec" style="margin-bottom:0"><i class="ti ti-bell"></i> Notifikasi</div>
+      <button onclick="clearNotif()" style="background:var(--bp);color:var(--mt);border:1px solid var(--br);border-radius:9px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Hapus Semua</button>
+    </div>
+    <div id="notif-list"></div>
+  </div>
+
+  <!-- ADMIN -->
+  <div class="pg" id="pg-admin">
+    <div class="tab-row">
+      <button class="tab-btn on" onclick="adTab('dashboard',this)"><i class="ti ti-dashboard"></i> Dashboard</button>
+      <button class="tab-btn" onclick="adTab('karyawan',this)"><i class="ti ti-users"></i> Karyawan</button>
+      <button class="tab-btn" onclick="adTab('laporan',this)"><i class="ti ti-report"></i> Laporan</button>
+      <button class="tab-btn" onclick="adTab('setting',this)"><i class="ti ti-adjustments"></i> Setting</button>
+    </div>
+    <div id="ad-dashboard">
+      <div id="sync-banner" style="background:#fef3c7;border:1px solid #fde68a;border-radius:12px;padding:12px;margin-bottom:12px;display:none">
+        <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:6px">⚠️ Data belum tersinkron ke server</div>
+        <div style="font-size:11px;color:#b45309;margin-bottom:10px">Data karyawan tersimpan lokal di HP ini. Klik tombol di bawah untuk sinkronisasi ke Firebase agar semua HP bisa login.</div>
+        <button class="btn btn-b" style="margin-bottom:0;padding:10px" onclick="syncKeFirebase()"><i class="ti ti-cloud-upload"></i> Sync Semua Data ke Firebase Sekarang</button>
+      </div>
+      <div class="admin-stat" id="admin-stat"></div>
+      <div class="sec"><i class="ti ti-users"></i> Status Karyawan Hari Ini</div>
+      <div id="emp-today"></div>
+    </div>
+    <div id="ad-karyawan" style="display:none">
+      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+        <input type="search" class="srch-in" id="srch" placeholder="🔍 Cari nama karyawan..." oninput="renderEmpList()" style="flex:1;margin-bottom:0">
+        <button class="btn btn-b btn-sm" onclick="showAddEmp()"><i class="ti ti-plus"></i> Tambah</button>
+      </div>
+      <div id="emp-list"></div>
+    </div>
+    <div id="ad-laporan" style="display:none">
+      <div style="display:flex;gap:7px;margin-bottom:12px">
+        <select id="sel-bln" style="flex:1;padding:9px;border:1.5px solid var(--br);border-radius:10px;font-size:12px;color:var(--tx);background:#fff;outline:none" onchange="renderLap()"></select>
+        <select id="sel-emp" style="flex:1;padding:9px;border:1.5px solid var(--br);border-radius:10px;font-size:12px;color:var(--tx);background:#fff;outline:none" onchange="renderLap()"><option value="all">Semua</option></select>
+      </div>
+      <div class="tbl-wrap">
+        <table class="lp-tbl">
+          <thead><tr><th style="width:28%">Nama</th><th style="width:12%">Hari</th><th style="width:12%">Jam</th><th style="width:28%">Gaji</th><th style="width:20%">Status</th></tr></thead>
+          <tbody id="lap-body"></tbody>
+        </table>
+      </div>
+      <div class="gaji-tot"><div class="gtl">Total Penggajian</div><div class="gtn" id="lap-total-n">Rp 0</div><div class="gtd" id="lap-total-d">0 karyawan</div></div>
+      <div class="exp-row">
+        <button class="exp-btn exp-csv" onclick="exportCSV()"><i class="ti ti-file-spreadsheet"></i> Export CSV</button>
+        <button class="exp-btn exp-pdf" onclick="exportPDF()"><i class="ti ti-printer"></i> Cetak PDF</button>
+      </div>
+    </div>
+    <div id="ad-setting" style="display:none">
+
+      <!-- INFORMASI PERUSAHAAN -->
+      <div class="gcard">
+        <div class="sec" style="font-size:12px"><i class="ti ti-building"></i> Informasi Perusahaan</div>
+        <label class="flbl">Nama Perusahaan</label>
+        <input type="text" class="fin" id="cfg-perusahaan" placeholder="Nama perusahaan Anda">
+        <label class="flbl">Alamat Kantor</label>
+        <input type="text" class="fin" id="cfg-alamat" placeholder="Alamat lengkap kantor">
+      </div>
+
+      <!-- LOKASI KANTOR + RADIUS -->
+      <div class="gcard">
+        <div class="sec" style="font-size:12px"><i class="ti ti-map-pin"></i> Lokasi Kantor 1 &amp; Radius Absen</div>
+        <div style="font-size:11px;color:var(--mt);margin-bottom:10px;line-height:1.6;background:var(--bl);border-radius:9px;padding:9px">
+          📌 Karyawan hanya bisa absen jika berada dalam radius salah satu lokasi kantor.<br>
+          Kosongkan koordinat jika tidak ingin membatasi lokasi.
+        </div>
+        <label class="flbl">Nama Lokasi 1</label>
+        <input type="text" class="fin" id="cfg-nama1" placeholder="Contoh: Kantor Pusat">
+        <label class="flbl">Latitude Lokasi 1</label>
+        <input type="text" class="fin" id="cfg-lat" placeholder="Contoh: -7.257472">
+        <label class="flbl">Longitude Lokasi 1</label>
+        <input type="text" class="fin" id="cfg-lon" placeholder="Contoh: 112.752088">
+        <button class="btn btn-w" style="margin-bottom:10px" onclick="ambilKoordinatKantor(1)">
+          <i class="ti ti-current-location"></i> Ambil Koordinat Posisi Saya (Lokasi 1)
+        </button>
+        <div id="preview-koordinat" style="display:none;background:var(--bp);border:1px solid var(--br);border-radius:10px;padding:10px;margin-bottom:12px;font-size:11px">
+          <div id="preview-koordinat-text"></div>
+          <a id="preview-maps-link" href="#" target="_blank" style="color:#0ea5e9;font-weight:700;font-size:11px;display:inline-block;margin-top:4px">🗺️ Lihat di Google Maps</a>
+        </div>
+
+        <div style="height:1px;background:var(--br);margin:4px 0 14px"></div>
+        <div class="sec" style="font-size:12px"><i class="ti ti-map-pin"></i> Lokasi Kantor 2 (Opsional)</div>
+        <label class="flbl">Nama Lokasi 2</label>
+        <input type="text" class="fin" id="cfg-nama2" placeholder="Contoh: Kantor Cabang">
+        <label class="flbl">Latitude Lokasi 2</label>
+        <input type="text" class="fin" id="cfg-lat2" placeholder="Contoh: -7.318000">
+        <label class="flbl">Longitude Lokasi 2</label>
+        <input type="text" class="fin" id="cfg-lon2" placeholder="Contoh: 112.731000">
+        <button class="btn btn-w" style="margin-bottom:10px" onclick="ambilKoordinatKantor(2)">
+          <i class="ti ti-current-location"></i> Ambil Koordinat Posisi Saya (Lokasi 2)
+        </button>
+        <div id="preview-koordinat2" style="display:none;background:var(--bp);border:1px solid var(--br);border-radius:10px;padding:10px;margin-bottom:12px;font-size:11px">
+          <div id="preview-koordinat-text2"></div>
+          <a id="preview-maps-link2" href="#" target="_blank" style="color:#0ea5e9;font-weight:700;font-size:11px;display:inline-block;margin-top:4px">🗺️ Lihat di Google Maps</a>
+        </div>
+
+        <label class="flbl">Maksimal Radius Absen (berlaku untuk kedua lokasi)</label>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <input type="range" id="cfg-radius" min="50" max="1000" step="50" value="200"
+            oninput="document.getElementById('radius-val').textContent=this.value+' meter'"
+            style="flex:1;accent-color:var(--bd)">
+          <span id="radius-val" style="font-size:13px;font-weight:700;color:var(--bd);white-space:nowrap;min-width:80px">200 meter</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--mt);margin-bottom:12px;padding:0 2px">
+          <span>50m (ketat)</span><span>500m</span><span>1000m (longgar)</span>
+        </div>
+        <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:9px;padding:9px;font-size:11px;color:#92400e">
+          ⚠️ <strong>Aktif hanya jika koordinat diisi.</strong> Jika kosong, semua lokasi diizinkan.
+        </div>
+      </div>
+
+      <!-- JAM KERJA & TARIF -->
+      <div class="gcard">
+        <div class="sec" style="font-size:12px"><i class="ti ti-clock"></i> Jam Kerja, Istirahat &amp; Tarif</div>
+        <div style="display:flex;gap:8px;margin-bottom:0">
+          <div style="flex:1">
+            <label class="flbl">Jam Masuk</label>
+            <input type="time" class="fin" id="cfg-jam-masuk" value="08:00">
+          </div>
+          <div style="flex:1">
+            <label class="flbl">Jam Keluar</label>
+            <input type="time" class="fin" id="cfg-jam-keluar" value="17:00">
+          </div>
+        </div>
+
+        <div style="height:1px;background:var(--br);margin:4px 0 12px"></div>
+        <div class="sec" style="font-size:12px;margin-bottom:6px"><i class="ti ti-coffee"></i> Jam Istirahat <span style="font-size:10px;font-weight:400;color:var(--mt)">(tidak dihitung jam kerja &amp; gaji)</span></div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <div style="flex:1">
+            <label class="flbl">Mulai Istirahat</label>
+            <input type="time" class="fin" id="cfg-istirahat-mulai" value="12:00">
+          </div>
+          <div style="flex:1">
+            <label class="flbl">Selesai Istirahat</label>
+            <input type="time" class="fin" id="cfg-istirahat-selesai" value="13:00">
+          </div>
+        </div>
+        <div style="background:var(--bp);border:1px solid var(--br);border-radius:9px;padding:9px;font-size:11px;color:var(--mt);margin-bottom:12px">
+          <i class="ti ti-info-circle" style="font-size:12px;vertical-align:-2px"></i>
+          Waktu istirahat <strong id="info-istirahat">12:00–13:00 (60 menit)</strong> akan dipotong otomatis dari total jam kerja dan gaji setiap hari.
+        </div>
+
+        <label class="flbl">Tarif Per Jam (Rp)</label>
+        <input type="number" class="fin" id="cfg-tarif" value="12500" min="1000"
+          oninput="updatePreviewGaji()">
+        <div style="background:var(--bl);border-radius:9px;padding:10px;font-size:12px;color:#0369a1;margin-top:-4px;margin-bottom:12px">
+          <div style="font-weight:700;margin-bottom:4px">💰 Preview Estimasi Gaji Harian:</div>
+          <div id="preview-gaji-harian" style="font-size:13px;font-weight:700;color:var(--bd)">-</div>
+        </div>
+      </div><!-- /gcard jam kerja -->
+
+      <!-- TOMBOL SIMPAN -->
+      <button class="btn btn-b" onclick="saveSetting()">
+        <i class="ti ti-device-floppy"></i> Simpan Semua Pengaturan
+      </button>
+
+      <!-- GANTI PASSWORD -->
+      <div class="gcard">
+        <div class="sec" style="font-size:12px"><i class="ti ti-lock"></i> Ganti Password Admin</div>
+        <label class="flbl">Password Lama</label>
+        <input type="password" class="fin" id="pw-old" placeholder="Password saat ini">
+        <label class="flbl">Password Baru (min 6 karakter)</label>
+        <input type="password" class="fin" id="pw-new" placeholder="Password baru">
+        <label class="flbl">Konfirmasi Password Baru</label>
+        <input type="password" class="fin" id="pw-confirm" placeholder="Ulangi password baru">
+        <button class="btn btn-b" onclick="gantiPw()"><i class="ti ti-key"></i> Ganti Password</button>
+      </div>
+
+      <!-- BACKUP -->
+      <div class="gcard">
+        <div class="sec" style="font-size:12px"><i class="ti ti-database"></i> Backup &amp; Restore Data</div>
+        <div style="font-size:11px;color:var(--mt);margin-bottom:12px;line-height:1.6">Data tersimpan di browser HP ini. Backup otomatis dibuat setiap hari dan bisa didownload manual kapan saja.</div>
+        <div id="auto-backup-info" style="background:var(--bp);border:1px solid var(--br);border-radius:9px;padding:10px;margin-bottom:12px;font-size:11px;color:var(--tx)">
+          <div style="font-weight:700;margin-bottom:6px;color:var(--bd)">📅 Riwayat Backup Otomatis:</div>
+          <div id="backup-list">Belum ada backup</div>
+        </div>
+        <button class="btn btn-w" onclick="exportBackup()"><i class="ti ti-download"></i> Download Backup Sekarang</button>
+        <button class="btn btn-w" onclick="document.getElementById('import-file').click()"><i class="ti ti-upload"></i> Import Backup Data</button>
+        <input type="file" id="import-file" accept=".json" style="display:none" onchange="doImport(event)">
+        <button class="btn" style="background:#fee2e2;color:#dc2626;margin-top:4px" onclick="resetData()"><i class="ti ti-trash"></i> Reset Semua Data</button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- MODAL ABSEN -->
+<div class="modal-bg" id="mdAbsen">
+  <div class="modal">
+    <h3 id="md-title">Konfirmasi Absen</h3>
+    <img id="md-ft" class="modal-ft" src="" alt="foto">
+    <div class="minfo" id="md-info"></div>
+    <div class="modal-acts"><button class="mc" onclick="closeMd('mdAbsen')">Batal</button><button class="mk" onclick="konfirmasi()">✓ Konfirmasi</button></div>
+  </div>
+</div>
+
+<!-- MODAL KARYAWAN -->
+<div class="modal-bg" id="mdEmp">
+  <div class="modal">
+    <h3 id="emp-form-title">Tambah Karyawan</h3>
+    <label class="flbl">Nama Lengkap *</label><input type="text" class="fin" id="ef-nama" placeholder="Nama lengkap">
+    <label class="flbl">Jabatan *</label><input type="text" class="fin" id="ef-jab" placeholder="Jabatan / posisi">
+    <label class="flbl">Divisi</label><input type="text" class="fin" id="ef-div" placeholder="Contoh: Operasional, IT, HRD">
+    <label class="flbl">Username Login *</label><input type="text" class="fin" id="ef-un" placeholder="Username unik (huruf kecil)">
+    <label class="flbl">Password * <span id="ef-pw-hint" style="font-weight:400;color:var(--mt)">(kosongkan jika tidak diubah)</span></label>
+    <input type="password" class="fin" id="ef-pw" placeholder="Min 4 karakter">
+    <label class="flbl">Warna Avatar</label>
+    <input type="color" id="ef-warna" value="#0ea5e9" style="width:100%;height:42px;border:1.5px solid var(--br);border-radius:11px;padding:4px;margin-bottom:12px;cursor:pointer;background:#fff">
+    <div class="modal-acts"><button class="mc" onclick="closeMd('mdEmp')">Batal</button><button class="mk" onclick="saveEmp()">Simpan</button></div>
+  </div>
+</div>
+
+<!-- FOTO PREVIEW -->
+<div class="foto-prev" id="fotoPrev" onclick="closeFotoPrev()">
+  <button class="foto-prev-x"><i class="ti ti-x"></i></button>
+  <img id="fotoPrevImg" src="" alt="foto">
+</div>
+
+<!-- INSTALL BANNER -->
+<div id="install-banner">
+  <div style="width:40px;height:40px;background:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">🦉</div>
+  <div style="flex:1;color:#fff"><div style="font-size:13px;font-weight:700">Install Aplikasi OWL</div><div style="font-size:11px;opacity:.9">Tambahkan ke layar utama HP</div></div>
+  <button id="btn-install" style="background:#fff;color:#0ea5e9;border:none;border-radius:9px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer">Install</button>
+  <button id="btn-install-close" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:9px;padding:8px 10px;cursor:pointer">✕</button>
+</div>
+
+<!-- COPYRIGHT -->
+<div style="text-align:center;padding:12px 0 18px;background:#fff;border-top:1px solid var(--bl)">
+  <div style="font-size:11px;color:var(--mt)">© 2025 <strong style="color:var(--bd);letter-spacing:.5px">GII-BOX</strong></div>
+  <div style="font-size:9px;color:var(--br);margin-top:2px;letter-spacing:.3px">OWL Absensi v1.0 · All rights reserved</div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ══════════════════════════════════════════════════════
+// FIREBASE CONFIG
+// ══════════════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey            : "AIzaSyCRcEsly9LbTBZ5xazA_a1KfGsdaplp_4U",
+  authDomain        : "owl-absensi.firebaseapp.com",
+  databaseURL       : "https://owl-absensi-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId         : "owl-absensi",
+  storageBucket     : "owl-absensi.firebasestorage.app",
+  messagingSenderId : "300417340751",
+  appId             : "1:300417340751:web:a7e6ded003e5d1ec70613a"
+};
+
+// ── FIREBASE HELPERS — sudah didefinisikan di atas (FB object) ──
+let _db = null;
+function getDB(){ return true; }
+
+// ── LOCAL CACHE ───────────────────────────────────────
+const CACHE = {};
+const DB = {
+  get: k => {
+    if(CACHE[k] !== undefined) return CACHE[k];
+    try { return JSON.parse(localStorage.getItem('owl_'+k)); } catch(e) { return null; }
+  },
+  setLocal: (k,v) => {
+    CACHE[k] = v;
+    try { localStorage.setItem('owl_'+k, JSON.stringify(v)); } catch(e) {}
+  },
+  del: k => {
+    delete CACHE[k];
+    try { localStorage.removeItem('owl_'+k); } catch(e) {}
+  }
+};
+
+// ── INIT DATA (pertama kali) ──────────────────────────
+async function initData(){
+  showLoading('Menghubungkan ke server...');
+  try {
+    const data = await FB.get('owl');
+    if(data){
+      Object.keys(data).forEach(k => DB.setLocal(k, data[k]));
+      if(!data.initialized) await initDataBaru();
+    } else {
+      await initDataBaru();
+    }
+  } catch(e) {
+    console.warn('initData error:', e);
+    initDataLokal();
+  }
+  hideLoading();
+}
+
+async function initDataBaru(){
+  const def = {
+    users:{admin:{pw:'admin123',nama:'Administrator',jab:'Admin Sistem',div:'Manajemen',id:'ADM-001',role:'admin',warna:'#ef4444'}},
+    absensi:{}, notifs:[], initialized:true,
+    config:{tarifJam:12500,jamMasuk:'08:00',jamKeluar:'17:00',perusahaan:'Perusahaan Anda',alamat:''}
+  };
+  await FB.set('owl', def);
+  Object.keys(def).forEach(k => DB.setLocal(k, def[k]));
+  document.getElementById('first-box').style.display='block';
+}
+
+function initDataLokal(){
+  if(!DB.get('initialized')){
+    DB.setLocal('users',{admin:{pw:'admin123',nama:'Administrator',jab:'Admin Sistem',div:'Manajemen',id:'ADM-001',role:'admin',warna:'#ef4444'}});
+    DB.setLocal('absensi',{});
+    DB.setLocal('notifs',[]);
+    DB.setLocal('config',{tarifJam:12500,jamMasuk:'08:00',jamKeluar:'17:00',perusahaan:'Perusahaan Anda',alamat:''});
+    DB.setLocal('initialized',true);
+    document.getElementById('first-box').style.display='block';
+  }
+}
+
+// ── LOADING OVERLAY ───────────────────────────────────
+function showLoading(msg='Memuat...'){
+  let el=document.getElementById('loading-overlay');
+  if(!el){
+    el=document.createElement('div');
+    el.id='loading-overlay';
+    el.style.cssText='position:fixed;inset:0;background:rgba(14,165,233,.97);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;gap:14px';
+    el.innerHTML=`<div style="font-size:44px">🦉</div>
+      <div style="font-size:16px;font-weight:700;letter-spacing:2px">OWL</div>
+      <div id="loading-msg" style="font-size:13px;opacity:.85">${msg}</div>
+      <div style="width:40px;height:4px;background:rgba(255,255,255,.3);border-radius:4px;overflow:hidden;margin-top:4px">
+        <div id="loading-bar" style="height:100%;width:30%;background:#fff;border-radius:4px;animation:lb 1s infinite alternate"></div>
+      </div>`;
+    const st=document.createElement('style');
+    st.textContent='@keyframes lb{from{width:20%}to{width:80%}}';
+    document.head.appendChild(st);
+    document.body.appendChild(el);
+  } else {
+    document.getElementById('loading-msg').textContent=msg;
+    el.style.display='flex';
+  }
+}
+function hideLoading(){
+  const el=document.getElementById('loading-overlay');
+  if(el) el.style.display='none';
+}
+
+// ── BANNER SETUP FIREBASE ─────────────────────────────
+function showFirebaseSetupBanner(){
+  const b=document.getElementById('first-box');
+  if(b){
+    b.style.display='block';
+    b.innerHTML=`<div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:6px">⚙️ Setup Firebase Diperlukan</div>
+      <div style="font-size:11px;color:#b45309;line-height:1.7">
+        Aplikasi berjalan mode <strong>offline</strong> (data hanya tersimpan di HP ini).<br>
+        Untuk multi-user, ikuti panduan setup Firebase di bawah ini.<br>
+        <a href="#" onclick="showPanduanFirebase()" style="color:#0ea5e9;font-weight:700">📖 Lihat Panduan Setup Firebase →</a>
+      </div>`;
+  }
+}
+
+function showPanduanFirebase(){
+  const html=`
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;overflow-y:auto;padding:16px">
+    <div style="background:#fff;border-radius:18px;padding:20px;max-width:420px;margin:0 auto">
+      <h3 style="font-size:16px;font-weight:700;color:#0c4a6e;margin-bottom:14px">🔥 Panduan Setup Firebase</h3>
+      <div style="font-size:12px;color:#64748b;line-height:1.8">
+        <strong style="color:#0c4a6e">Langkah 1</strong> — Buka <a href="https://console.firebase.google.com" target="_blank" style="color:#0ea5e9;font-weight:700">console.firebase.google.com</a><br><br>
+        <strong style="color:#0c4a6e">Langkah 2</strong> — Klik <strong>"Add project"</strong> → isi nama: <strong>owl-absensi</strong> → Create<br><br>
+        <strong style="color:#0c4a6e">Langkah 3</strong> — Klik ikon <strong>&lt;/&gt; Web</strong> → Register app → Copy <strong>firebaseConfig</strong><br><br>
+        <strong style="color:#0c4a6e">Langkah 4</strong> — Klik <strong>Realtime Database</strong> → Create database → pilih <strong>Asia Southeast</strong> → <strong>Test mode</strong><br><br>
+        <strong style="color:#0c4a6e">Langkah 5</strong> — Buka file <strong>index.html</strong> → cari <code>FIREBASE_CONFIG</code> → ganti semua nilai <strong>GANTI_...</strong> dengan nilai dari Firebase<br><br>
+        <strong style="color:#0c4a6e">Langkah 6</strong> — Upload ulang ke Netlify → selesai! Semua HP bisa login 🎉
+      </div>
+      <button onclick="this.parentElement.parentElement.remove()" style="width:100%;padding:12px;background:#0ea5e9;color:#fff;border:none;border-radius:11px;font-size:14px;font-weight:700;cursor:pointer;margin-top:14px">Tutup</button>
+    </div></div>`;
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+// ── GETTERS ───────────────────────────────────────────
+const getUsers    = () => DB.get('users')   || {};
+const getCfg      = () => DB.get('config')  || {tarifJam:12500,jamMasuk:'08:00',jamKeluar:'17:00',perusahaan:'Perusahaan Anda',alamat:''};
+const getNotifs   = () => DB.get('notifs')  || [];
+const getAllAbsensi= () => DB.get('absensi') || {};
+const getUserAbs  = uid => (getAllAbsensi()[uid]) || [];
+
+async function saveUserAbs(uid, list){
+  const a = getAllAbsensi();
+  a[uid] = list;
+  DB.setLocal('absensi', a);
+  await FB.set('owl/absensi', a);
+}
+
+async function saveNotifs(list){
+  DB.setLocal('notifs', list);
+  await FB.set('owl/notifs', list);
+}
+
+async function saveConfig(cfg){
+  DB.setLocal('config', cfg);
+  await FB.set('owl/config', cfg);
+}
+
+// ── SESSION ───────────────────────────────────────────
+let curUser=null,camStream=null,fotoData=null,lokasiData=null,absenPending=null,sessMasukMs=null;
+
+// ── CLOCK ─────────────────────────────────────────────
+const HR=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+const BL=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+function tick(){
+  const n=new Date();
+  const hj=document.getElementById('hdr-jam');if(hj)hj.textContent=n.toLocaleTimeString('id-ID');
+  const ht=document.getElementById('hdr-tgl');if(ht)ht.textContent=HR[n.getDay()]+', '+n.getDate()+' '+BL[n.getMonth()]+' '+n.getFullYear();
+}
+setInterval(tick,1000);tick();
+
+// ── TOAST ─────────────────────────────────────────────
+let tT;
+function toast(msg,tp=''){
+  clearTimeout(tT);
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast on '+tp;
+  tT=setTimeout(()=>t.className='toast',3200);
+}
+
+// ── LOGIN / LOGOUT ────────────────────────────────────
+function togglePw(){
+  const i=document.getElementById('upass'),ic=document.getElementById('eye-ic');
+  i.type=i.type==='password'?'text':'password';
+  ic.className='ti ti-eye'+(i.type==='text'?'-off':'');
+}
+
+async function doLogin(){
+  const u   = document.getElementById('uname').value.trim().toLowerCase();
+  const p   = document.getElementById('upass').value;
+  const err = document.getElementById('lerr');
+  const btn = document.querySelector('#login-screen .btn-b');
+
+  if(btn){btn.disabled=true; btn.innerHTML='<i class="ti ti-loader"></i> Memeriksa...';}
+
+  try {
+    // Ambil data users terbaru dari Firebase SDK
+    let users = getUsers();
+    const freshUsers = await FB.get('owl/users');
+    if(freshUsers){
+      users = freshUsers;
+      DB.setLocal('users', freshUsers);
+    }
+
+    if(users[u] && users[u].pw === p){
+      curUser = {...users[u], username:u};
+      saveSession(curUser);
+      err.style.display = 'none';
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app-screen').style.display  = 'block';
+      document.getElementById('first-box').style.display   = 'none';
+      initApp();
+      cekBackupHarian();
+    } else {
+      err.textContent = '❌ Username atau password salah!';
+      err.style.display = 'block';
+    }
+  } catch(e) {
+    err.textContent = '❌ Gagal terhubung ke server. Coba lagi.';
+    err.style.display = 'block';
+  } finally {
+    if(btn){btn.disabled=false; btn.innerHTML='<i class="ti ti-login"></i> Masuk';}
+  }
+}
+
+function doLogout(){
+  stopCam(true);
+  clearSession(); // ← hapus session saat logout
+  curUser=null;fotoData=null;lokasiData=null;sessMasukMs=null;
+  document.getElementById('app-screen').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('uname').value='';document.getElementById('upass').value='';
+  document.getElementById('lerr').style.display='none';
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
+  document.querySelector('.nb').classList.add('on');
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  document.getElementById('pg-absen').classList.add('on');
+  toast('Berhasil keluar','ok');
+}
+
+function initApp(){
+  const cfg=getCfg();
+  const ini=curUser.nama.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('av').textContent=ini;
+  document.getElementById('av').style.background=curUser.warna||'#0ea5e9';
+  document.getElementById('hdr-role').textContent=curUser.role==='admin'?'Administrator':'Karyawan';
+  document.getElementById('u-nama').textContent=curUser.nama;
+  document.getElementById('u-jab').textContent=curUser.jab;
+  document.getElementById('u-id').textContent=curUser.id;
+  document.getElementById('g-tarif').textContent='Rp '+cfg.tarifJam.toLocaleString('id-ID');
+  document.getElementById('info-tarif').textContent=cfg.tarifJam.toLocaleString('id-ID');
+  document.getElementById('nb-admin').style.display=curUser.role==='admin'?'':'none';
+
+  // status absen hari ini
+  const today=new Date().toLocaleDateString('id-ID');
+  const list=getUserAbs(curUser.username);
+  const masuk=list.find(a=>a.tipe==='masuk'&&a.tgl===today);
+  const keluar=list.find(a=>a.tipe==='keluar'&&a.tgl===today);
+  document.getElementById('s-masuk').textContent=masuk?masuk.jam:'--:--';
+  document.getElementById('s-keluar').textContent=keluar?keluar.jam:'--:--';
+  if(masuk&&masuk.durasiMs){
+    const jj=Math.floor(masuk.durasiMs/3600000),mm=Math.floor((masuk.durasiMs%3600000)/60000);
+    document.getElementById('s-dur').textContent=jj+'j '+mm+'m';
+  } else document.getElementById('s-dur').textContent='0j 0m';
+  document.getElementById('btnM').disabled=!!masuk;
+  document.getElementById('btnK').disabled=!masuk||!!keluar;
+  if(masuk&&!keluar)sessMasukMs=masuk.ms;
+
+  // reset kamera
+  fotoData=null;lokasiData=null;
+  document.getElementById('cvs').style.display='none';
+  document.getElementById('vid').style.display='none';
+  document.getElementById('camPh').style.display='flex';
+  document.getElementById('camOv').style.display='none';
+  document.getElementById('locVal').textContent='Belum dideteksi';
+
+  const notifs=getNotifs();
+  document.getElementById('ndot').style.display=notifs.length?'':'none';
+  getLoc();calcGaji();
+}
+
+// ── PAGE NAV ──────────────────────────────────────────
+function gp(id,btn){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
+  document.getElementById('pg-'+id).classList.add('on');
+  btn.classList.add('on');
+  stopCam(false);
+  if(id==='riwayat')renderRiwayat();
+  if(id==='gaji')calcGaji();
+  if(id==='notif'){renderNotif();document.getElementById('ndot').style.display='none';}
+  if(id==='admin'){renderAdminDash();renderEmpList();populateLapFilter();loadSetting();}
+}
+
+// ── CAMERA ────────────────────────────────────────────
+async function startCam(){
+  if(fotoData)return;
+  const v=document.getElementById('vid');
+  if(v.style.display==='block')return;
+
+  // Cek apakah browser support getUserMedia
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    showCamOptions(); return;
+  }
+
+  // Coba kamera depan dulu, fallback ke kamera apapun
+  const constraints=[
+    {video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false},
+    {video:{facingMode:{ideal:'user'}},audio:false},
+    {video:true,audio:false}
+  ];
+
+  for(let i=0;i<constraints.length;i++){
+    try{
+      camStream=await navigator.mediaDevices.getUserMedia(constraints[i]);
+      v.srcObject=camStream;
+      await new Promise(res=>v.onloadedmetadata=res);
+      v.play();
+      v.style.display='block';
+      document.getElementById('camPh').style.display='none';
+      document.getElementById('camOv').style.display='flex';
+      document.getElementById('btnSh').style.display='flex';
+      document.getElementById('btnRe').style.display='none';
+      return;
+    }catch(e){
+      if(i===constraints.length-1){
+        // Semua gagal — cek alasannya
+        if(e.name==='NotAllowedError'||e.name==='PermissionDeniedError'){
+          showCamOptions('izin');
+        } else if(location.protocol==='file:'){
+          showCamOptions('file');
+        } else {
+          showCamOptions('error');
+        }
+      }
+    }
+  }
+}
+
+function showCamOptions(alasan){
+  const ph=document.getElementById('camPh');
+  let msg='';
+  if(alasan==='izin') msg='⚠️ Izin kamera ditolak.<br>Ketuk ikon 🔒 di address bar → izinkan Kamera.';
+  else if(alasan==='file') msg='⚠️ Kamera butuh HTTPS.<br>Buka via Netlify/hosting atau gunakan foto dari galeri.';
+  else msg='⚠️ Kamera tidak tersedia di browser ini.';
+  ph.innerHTML=`<div style="padding:16px;text-align:center">
+    <i class="ti ti-camera-off" style="font-size:36px;color:rgba(255,255,255,.4);display:block;margin-bottom:8px"></i>
+    <div style="font-size:11px;color:rgba(255,255,255,.7);line-height:1.6;margin-bottom:12px">${msg}</div>
+    <button onclick="document.getElementById('foto-upload').click()" style="background:#38bdf8;color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;margin:0 auto">
+      <i class="ti ti-photo"></i> Pilih Foto dari Galeri
+    </button>
+  </div>`;
+  ph.style.display='flex';
+}
+
+function demoFoto(){
+  const c=document.getElementById('cvs'),ctx=c.getContext('2d');
+  c.width=480;c.height=320;
+  ctx.fillStyle='#0f172a';ctx.fillRect(0,0,480,320);
+  ctx.fillStyle=curUser.warna||'#0ea5e9';
+  ctx.beginPath();ctx.arc(240,130,72,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';ctx.font='bold 38px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(curUser.nama.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(),240,130);
+  ctx.fillStyle='rgba(0,0,0,.5)';ctx.fillRect(0,286,480,34);
+  ctx.fillStyle='#22c55e';ctx.font='bold 11px Arial';
+  ctx.fillText('OWL Absensi · '+curUser.nama+' · '+new Date().toLocaleString('id-ID'),240,305);
+  c.style.display='block';
+  document.getElementById('camPh').style.display='none';
+  document.getElementById('camOv').style.display='flex';
+  document.getElementById('btnSh').style.display='none';
+  document.getElementById('btnRe').style.display='flex';
+  fotoData=c.toDataURL('image/jpeg',.8);
+  toast('📸 Foto berhasil');
+}
+
+// Upload foto dari galeri / file
+function handleFotoUpload(e){
+  const file=e.target.files[0]; if(!file)return;
+  if(!file.type.startsWith('image/')){toast('❗ Pilih file gambar!','er');return;}
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const img=new Image();
+    img.onload=()=>{
+      const c=document.getElementById('cvs'),ctx=c.getContext('2d');
+      // resize max 640x480
+      const ratio=Math.min(640/img.width,480/img.height,1);
+      c.width=Math.round(img.width*ratio); c.height=Math.round(img.height*ratio);
+      ctx.drawImage(img,0,0,c.width,c.height);
+      // watermark
+      ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(0,c.height-34,c.width,34);
+      ctx.fillStyle='#fff';ctx.font='bold 11px Arial';ctx.textAlign='left';ctx.textBaseline='middle';
+      ctx.fillText('OWL · '+curUser.nama+' · '+new Date().toLocaleString('id-ID'),10,c.height-11);
+      fotoData=c.toDataURL('image/jpeg',.82);
+      c.style.display='block';
+      document.getElementById('camPh').style.display='none';
+      document.getElementById('camOv').style.display='flex';
+      document.getElementById('btnSh').style.display='none';
+      document.getElementById('btnRe').style.display='flex';
+      toast('📸 Foto dari galeri berhasil!','ok');
+    };
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value='';
+}
+
+function snap(e){
+  e.stopPropagation();
+  const v=document.getElementById('vid'),c=document.getElementById('cvs');
+  c.width=v.videoWidth||480;c.height=v.videoHeight||320;
+  const ctx=c.getContext('2d');ctx.drawImage(v,0,0);
+  ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(0,c.height-34,c.width,34);
+  ctx.fillStyle='#fff';ctx.font='bold 11px Arial';ctx.textAlign='left';ctx.textBaseline='middle';
+  ctx.fillText('OWL · '+curUser.nama+' · '+new Date().toLocaleString('id-ID'),10,c.height-11);
+  fotoData=c.toDataURL('image/jpeg',.82);
+  c.style.display='block';v.style.display='none';
+  document.getElementById('btnSh').style.display='none';
+  document.getElementById('btnRe').style.display='flex';
+  stopCam(false);toast('📸 Foto berhasil!','ok');
+}
+
+function retake(e){
+  e.stopPropagation();fotoData=null;
+  document.getElementById('cvs').style.display='none';
+  document.getElementById('camOv').style.display='none';
+  document.getElementById('camPh').style.display='flex';
+  startCam();
+}
+
+function stopCam(clr=false){
+  if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;}
+  if(clr){
+    fotoData=null;
+    document.getElementById('vid').style.display='none';
+    document.getElementById('cvs').style.display='none';
+    document.getElementById('camPh').style.display='flex';
+    document.getElementById('camOv').style.display='none';
+  }
+}
+
+// ── GPS + GOOGLE MAPS ────────────────────────────────
+function getLoc(){
+  const el=document.getElementById('locVal');
+  const elAlamat=document.getElementById('locAlamat');
+  el.textContent='📡 Mendeteksi GPS...';
+  elAlamat.style.display='none';
+  document.getElementById('btn-maps').style.display='none';
+
+  if(!navigator.geolocation){
+    showLocManual('GPS tidak didukung browser ini.');
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    async pos=>{
+      const lat=pos.coords.latitude.toFixed(6);
+      const lon=pos.coords.longitude.toFixed(6);
+      const acc=Math.round(pos.coords.accuracy);
+      lokasiData={lat,lon,acc,kota:''};
+
+      // Tampilkan koordinat dulu
+      el.textContent='📍 '+lat+', '+lon+' (±'+acc+'m)';
+      document.getElementById('btn-maps').style.display='block';
+      toast('📍 GPS terdeteksi! Mengambil nama lokasi...','ok');
+
+      // Reverse geocoding pakai OpenStreetMap Nominatim (gratis, tanpa API key)
+      try{
+        const res=await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`,
+          {headers:{'Accept-Language':'id'}}
+        );
+        const data=await res.json();
+        if(data&&data.address){
+          const a=data.address;
+          // Susun alamat: jalan, kelurahan, kecamatan, kota
+          const parts=[
+            a.road||a.pedestrian||a.footway||'',
+            a.village||a.suburb||a.neighbourhood||'',
+            a.city_district||a.county||'',
+            a.city||a.town||a.municipality||''
+          ].filter(Boolean);
+          const alamatLengkap=parts.slice(0,3).join(', ');
+          lokasiData.kota=alamatLengkap||data.display_name.split(',').slice(0,3).join(',');
+          el.textContent='📍 '+alamatLengkap;
+          elAlamat.textContent='Koordinat: '+lat+', '+lon+' (±'+acc+'m)';
+          elAlamat.style.display='block';
+        }
+      }catch(e){
+        // Gagal geocoding — koordinat saja sudah cukup
+        lokasiData.kota=lat+', '+lon;
+      }
+    },
+    err=>{
+      let pesan='GPS tidak tersedia';
+      if(err.code===1) pesan='Izin lokasi ditolak — aktifkan di pengaturan browser';
+      else if(err.code===2) pesan='Sinyal GPS lemah / tidak ada';
+      else if(err.code===3) pesan='GPS timeout — coba lagi';
+      showLocManual(pesan);
+    },
+    {timeout:12000,enableHighAccuracy:true,maximumAge:0}
+  );
+}
+
+function bukaMaps(){
+  if(!lokasiData)return;
+  const url=`https://www.google.com/maps?q=${lokasiData.lat},${lokasiData.lon}&z=17`;
+  window.open(url,'_blank');
+}
+
+function showLocManual(alasan){
+  const el=document.getElementById('locVal');
+  el.innerHTML=`<span style="color:#ef4444;font-size:11px">⚠️ ${alasan}</span><br>
+    <div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">
+      <button onclick="getLoc()" style="background:var(--bl);color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:3px 9px;font-size:10px;font-weight:700;cursor:pointer">🔄 Coba Lagi</button>
+      <button onclick="pakaiLokasiDefault()" style="background:#dcfce7;color:#15803d;border:1px solid #86efac;border-radius:7px;padding:3px 9px;font-size:10px;font-weight:700;cursor:pointer">📍 Lokasi Kantor</button>
+      <button onclick="inputLokasiManual()" style="background:#fef3c7;color:#b45309;border:1px solid #fde68a;border-radius:7px;padding:3px 9px;font-size:10px;font-weight:700;cursor:pointer">✏️ Input Manual</button>
+    </div>`;
+}
+
+function pakaiLokasiDefault(){
+  const cfg=getCfg();
+  const lat=cfg.latKantor||'-7.257472';
+  const lon=cfg.lonKantor||'112.752088';
+  lokasiData={lat,lon,acc:0,kota:cfg.perusahaan||'Lokasi Kantor'};
+  document.getElementById('locVal').textContent='📍 '+lokasiData.kota;
+  document.getElementById('locAlamat').textContent='Koordinat: '+lat+', '+lon;
+  document.getElementById('locAlamat').style.display='block';
+  document.getElementById('btn-maps').style.display='block';
+  toast('📍 Menggunakan lokasi kantor default','warn');
+}
+
+function inputLokasiManual(){
+  const lat=prompt('Masukkan Latitude:\n(Contoh: -7.257472)\n\nCara cari: buka Google Maps → tahan titik → lihat angka di bawah)');
+  if(!lat||isNaN(parseFloat(lat))){toast('❗ Latitude tidak valid','er');return;}
+  const lon=prompt('Masukkan Longitude:\n(Contoh: 112.752088)');
+  if(!lon||isNaN(parseFloat(lon))){toast('❗ Longitude tidak valid','er');return;}
+  lokasiData={lat:parseFloat(lat).toFixed(6),lon:parseFloat(lon).toFixed(6),acc:0,kota:'Lokasi Manual'};
+  document.getElementById('locVal').textContent='📍 Lokasi Manual';
+  document.getElementById('locAlamat').textContent='Koordinat: '+lokasiData.lat+', '+lokasiData.lon;
+  document.getElementById('locAlamat').style.display='block';
+  document.getElementById('btn-maps').style.display='block';
+  toast('📍 Lokasi manual disimpan','ok');
+}
+
+// ── ABSEN ─────────────────────────────────────────────
+function doAbsen(tipe){
+  if(!fotoData){toast('❗ Ambil foto selfie dahulu!','er');return;}
+  if(!lokasiData){toast('❗ Deteksi lokasi GPS dahulu!','er');return;}
+
+  // ── CEK RADIUS ──
+  const cek=cekRadius();
+  if(!cek.ok){
+    const cfg=getCfg();
+    // Tampilkan link ke lokasi terdekat
+    const latT = cek.noTerdekat===2 ? cfg.latKantor2 : cfg.latKantor;
+    const lonT = cek.noTerdekat===2 ? cfg.lonKantor2 : cfg.lonKantor;
+    const mapsUrl=`https://www.google.com/maps?q=${latT},${lonT}&z=17`;
+    document.getElementById('md-title').textContent='🚫 Di Luar Area Kantor';
+    document.getElementById('md-ft').src=fotoData;
+    document.getElementById('md-info').innerHTML=
+      `<div style="text-align:center;padding:4px 0">
+        <div style="font-size:32px;margin-bottom:6px">📍</div>
+        <div style="font-weight:700;color:#dc2626;font-size:14px;margin-bottom:8px">Lokasi terlalu jauh dari kantor!</div>
+        <div style="font-size:12px;color:var(--mt);margin-bottom:10px">
+          Lokasi terdekat: <strong>${cek.lokasiTerdekat||'Kantor'}</strong><br>
+          Jarak Anda: <strong style="color:#dc2626">${cek.jarak} meter</strong><br>
+          Maksimal radius: <strong style="color:#15803d">${cek.radius} meter</strong>
+        </div>
+        <a href="${mapsUrl}" target="_blank" style="display:inline-block;background:#e0f2fe;color:#0369a1;padding:7px 16px;border-radius:9px;font-size:12px;font-weight:700;text-decoration:none;margin-bottom:8px">🗺️ Arahkan ke Lokasi Kantor</a>
+        <div style="font-size:11px;color:var(--mt);margin-top:6px">Pastikan Anda berada di area kantor,<br>lalu deteksi ulang GPS.</div>
+      </div>`;
+    document.querySelector('#mdAbsen .mk').textContent='Tutup';
+    document.querySelector('#mdAbsen .mk').onclick=()=>closeMd('mdAbsen');
+    document.querySelector('#mdAbsen .mc').style.display='none';
+    openMd('mdAbsen');
+    return;
+  }
+
+  // Reset tombol modal ke normal
+  document.querySelector('#mdAbsen .mk').textContent='✓ Konfirmasi';
+  document.querySelector('#mdAbsen .mk').onclick=konfirmasi;
+  document.querySelector('#mdAbsen .mc').style.display='';
+
+  absenPending=tipe;
+  const n=new Date();
+  const cfg=getCfg();
+  document.getElementById('md-title').textContent=tipe==='masuk'?'✅ Konfirmasi Absen Masuk':'🚪 Konfirmasi Absen Keluar';
+  document.getElementById('md-ft').src=fotoData;
+  const mapsUrl=`https://www.google.com/maps?q=${lokasiData.lat},${lokasiData.lon}&z=17`;
+  // Info lokasi kantor terdekat yang lolos
+  let lokasiKantorInfo='';
+  if(cek.lokasi){
+    lokasiKantorInfo=`<br><strong>Lokasi kantor:</strong> <span style="color:#15803d">✓ ${cek.lokasi} (${cek.jarak} m)</span>`;
+  }
+  // Info istirahat
+  const iInfo=cfg.istirahatMulai?`<br><span style="font-size:10px;color:var(--am)">⏸ Istirahat ${cfg.istirahatMulai}–${cfg.istirahatSelesai} tidak dihitung</span>`:'';
+  document.getElementById('md-info').innerHTML=
+    '<strong>Nama:</strong> '+curUser.nama+' ('+curUser.id+')<br>'+
+    '<strong>Waktu:</strong> '+n.toLocaleString('id-ID')+'<br>'+
+    '<strong>Lokasi:</strong> '+(lokasiData.kota||lokasiData.lat+', '+lokasiData.lon)+'<br>'+
+    '<strong>Koordinat:</strong> <a href="'+mapsUrl+'" target="_blank" style="color:#0ea5e9;font-weight:700">'+lokasiData.lat+', '+lokasiData.lon+' 🗺️</a>'+
+    lokasiKantorInfo+iInfo;
+  openMd('mdAbsen');
+}
+
+function openMd(id){document.getElementById(id).classList.add('on');}
+function closeMd(id){document.getElementById(id).classList.remove('on');}
+
+function konfirmasi(){
+  closeMd('mdAbsen');
+  const n=new Date(),j=n.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+  const today=n.toLocaleDateString('id-ID');
+  const cfg=getCfg();
+  let list=getUserAbs(curUser.username);
+
+  if(absenPending==='masuk'){
+    const [jH,jM]=cfg.jamMasuk.split(':').map(Number);
+    const terlambat=n.getHours()>jH||(n.getHours()===jH&&n.getMinutes()>jM);
+    const rec={tipe:'masuk',jam:j,tgl:today,lokasi:{...lokasiData},foto:fotoData,ms:n.getTime(),terlambat,durasiMs:0,durasi:''};
+    list.unshift(rec);
+    saveUserAbs(curUser.username,list);
+    sessMasukMs=n.getTime();
+    document.getElementById('s-masuk').textContent=j;
+    document.getElementById('btnM').disabled=true;
+    document.getElementById('btnK').disabled=false;
+    if(terlambat){
+      pushNotif('warn','Keterlambatan',curUser.nama+' absen masuk '+j+' — terlambat!');
+      toast('⚠️ Absen Masuk tercatat (terlambat)','warn');
+    } else {
+      pushNotif('ok','Absen Masuk',curUser.nama+' absen masuk pukul '+j);
+      toast('🎉 Absen Masuk berhasil!','ok');
+    }
+  } else {
+    const km=n.getTime();
+    let durEfektifMs=0, durTotalMs=0, dur='0j 0m';
+
+    if(sessMasukMs && sessMasukMs > 0){
+      durTotalMs   = km - sessMasukMs;
+      durEfektifMs = hitungDurasiEfektif(sessMasukMs, km, cfg);
+      // Pastikan tidak negatif
+      durEfektifMs = Math.max(0, durEfektifMs);
+      const jj=Math.floor(durEfektifMs/3600000);
+      const mm=Math.floor((durEfektifMs%3600000)/60000);
+      dur=jj+'j '+mm+'m';
+    } else {
+      // Cari waktu masuk dari data tersimpan
+      const masukRec=list.find(a=>a.tipe==='masuk'&&a.tgl===today);
+      if(masukRec){
+        sessMasukMs=masukRec.ms;
+        durTotalMs=km-masukRec.ms;
+        durEfektifMs=Math.max(0,hitungDurasiEfektif(masukRec.ms,km,cfg));
+        const jj=Math.floor(durEfektifMs/3600000);
+        const mm=Math.floor((durEfektifMs%3600000)/60000);
+        dur=jj+'j '+mm+'m';
+      }
+    }
+
+    // Update record masuk dengan durasi efektif
+    const masukIdx=list.findIndex(a=>a.tipe==='masuk'&&a.tgl===today);
+    if(masukIdx>=0){
+      list[masukIdx].durasiMs   =durEfektifMs;
+      list[masukIdx].durasi     =dur;
+      list[masukIdx].durasiTotal=durTotalMs;
+    }
+    list.unshift({tipe:'keluar',jam:j,tgl:today,lokasi:{...lokasiData},foto:fotoData,ms:km});
+    saveUserAbs(curUser.username,list);
+
+    document.getElementById('s-keluar').textContent=j;
+    document.getElementById('s-dur').textContent=dur;
+    document.getElementById('btnK').disabled=true;
+
+    const iMenit=durTotalMs>0?Math.round((durTotalMs-durEfektifMs)/60000):0;
+    const iInfo=iMenit>0?' · dipotong istirahat '+iMenit+' mnt':'';
+    pushNotif('ok','Absen Keluar',curUser.nama+' keluar '+j+' · Kerja efektif: '+dur+iInfo);
+    toast('👋 Absen Keluar! Kerja efektif: '+dur,'ok');
+  }
+  stopCam(true);
+  calcGaji();
+}
+
+// ── RIWAYAT ───────────────────────────────────────────
+function renderRiwayat(){
+  const filter=document.getElementById('rw-filter').value;
+  let list=getUserAbs(curUser.username);
+  if(filter!=='all'){const cut=Date.now()-parseInt(filter)*86400000;list=list.filter(r=>r.ms>=cut);}
+  const el=document.getElementById('rw-list');
+  if(!list.length){el.innerHTML='<div class="empty"><i class="ti ti-history"></i><p>Belum ada riwayat absensi</p></div>';return;}
+  el.innerHTML=list.map(r=>{
+    const mapsUrl=r.lokasi?`https://www.google.com/maps?q=${r.lokasi.lat},${r.lokasi.lon}&z=17`:'#';
+    const lokasiTeks=r.lokasi?(r.lokasi.kota||r.lokasi.lat+', '+r.lokasi.lon):'Unknown';
+    return `<div class="ri">
+      <div class="ri-ic ${r.tipe==='masuk'?'m':'k'}"><i class="ti ti-${r.tipe==='masuk'?'login':'logout'}"></i></div>
+      <div class="ri-tx">
+        <div class="rn">${r.tipe==='masuk'?'Absen Masuk':'Absen Keluar'}${r.terlambat?' <span class="bdg bdg-a">Terlambat</span>':''}${r.durasi?' <span class="bdg bdg-b">'+r.durasi+'</span>':''}</div>
+        <div class="rd">${r.tgl} · <a href="${mapsUrl}" target="_blank" style="color:#0ea5e9;text-decoration:none">📍 ${lokasiTeks}</a></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        ${r.foto?`<img class="ri-ft" src="${r.foto}" onclick="previewFoto(this.src)" alt="foto">`:''}
+        <div class="ri-jm">${r.jam}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── GAJI ──────────────────────────────────────────────
+function calcGaji(){
+  const cfg=getCfg();
+  const list=getUserAbs(curUser.username);
+  const n=new Date(),bln=n.getMonth(),thn=n.getFullYear();
+  const bList=list.filter(r=>{const d=new Date(r.ms);return d.getMonth()===bln&&d.getFullYear()===thn&&r.tipe==='masuk';});
+  // durasiMs sudah efektif (dipotong istirahat) sejak konfirmasi
+  const totMs   = bList.reduce((s,r)=>s+(r.durasiMs||0),0);
+  const totJam  = Math.round(totMs/3600000*10)/10;
+  const totHari = bList.length;
+  const total   = Math.round(totJam*cfg.tarifJam);
+  const fmt=v=>'Rp '+v.toLocaleString('id-ID');
+  // hitung total menit istirahat terpotong bulan ini
+  const totPotong = bList.reduce((s,r)=>s+((r.durasiTotal||0)-(r.durasiMs||0)),0);
+  const potongMnt = Math.round(totPotong/60000);
+
+  document.getElementById('g-total').textContent  = fmt(total);
+  document.getElementById('g-det').textContent    = totJam+' jam efektif × '+fmt(cfg.tarifJam)+'/jam';
+  document.getElementById('g-hari').textContent   = totHari+' hari';
+  document.getElementById('g-jam').textContent    = totJam+' jam';
+  document.getElementById('g-total2').textContent = fmt(total);
+
+  // Rincian per minggu
+  const wk=['Minggu 1 (1–7)','Minggu 2 (8–14)','Minggu 3 (15–21)','Minggu 4 (22–31)'];
+  const wMs=[0,0,0,0];
+  bList.forEach(r=>{const d=new Date(r.ms).getDate();wMs[d<=7?0:d<=14?1:d<=21?2:3]+=(r.durasiMs||0);});
+  const iInfo=cfg.istirahatMulai?`<div class="gr-row" style="border-top:1px dashed var(--br)"><span class="grl">⏸ Potongan istirahat</span><span class="grv" style="color:var(--am)">${potongMnt} menit terpotong</span></div>`:'';
+  document.getElementById('g-minggu').innerHTML=wk.map((w,i)=>{
+    const jm=Math.round(wMs[i]/3600000*10)/10,gj=Math.round(jm*cfg.tarifJam);
+    return `<div class="gr-row"><span class="grl">${w}</span><span class="grv">${jm} jam · ${fmt(gj)}</span></div>`;
+  }).join('')+iInfo;
+}
+
+// ── NOTIF ─────────────────────────────────────────────
+function pushNotif(cat,tipe,msg){
+  const n=new Date(),list=getNotifs();
+  list.unshift({cat,tipe,msg,waktu:n.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}),tgl:n.toLocaleDateString('id-ID')});
+  DB.setLocal('notifs',list.slice(0,50));
+  document.getElementById('ndot').style.display='';
+}
+function renderNotif(){
+  const catIc={warn:'alert-triangle',ok:'check',info:'info-circle'};
+  const list=getNotifs(),el=document.getElementById('notif-list');
+  if(!list.length){el.innerHTML='<div class="empty"><i class="ti ti-bell-off"></i><p>Tidak ada notifikasi</p></div>';return;}
+  el.innerHTML=list.map(n=>`<div class="noti"><div class="noti-ic ${n.cat}"><i class="ti ti-${catIc[n.cat]||'bell'}"></i></div><div class="noti-tx"><div class="nt">${n.tipe}</div><div class="nd">${n.msg}</div><div class="ntime">🕐 ${n.tgl} · ${n.waktu}</div></div></div>`).join('');
+}
+function clearNotif(){DB.setLocal('notifs',[]);renderNotif();toast('Notifikasi dihapus');}
+
+// ── ADMIN HELPERS ─────────────────────────────────────
+const isAdmin=()=>curUser&&curUser.role==='admin';
+async function guardAdmin(fn){
+  if(!isAdmin()){toast('🔒 Hanya Admin!','er');return;}
+  await fn();
+}
+
+function adTab(id,btn){
+  ['dashboard','karyawan','laporan','setting'].forEach(x=>document.getElementById('ad-'+x).style.display=x===id?'':'none');
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');
+  if(id==='laporan')populateLapFilter();
+  if(id==='setting')loadSetting();
+}
+
+// ── SYNC KE FIREBASE ─────────────────────────────────
+async function syncKeFirebase(){
+  const btn = document.querySelector('#sync-banner button');
+  if(btn){btn.disabled=true; btn.innerHTML='<i class="ti ti-loader"></i> Menyinkronkan...';}
+  toast('⏳ Menyinkronkan data ke Firebase...','');
+
+  try {
+    const users   = getUsers();
+    const absensi = getAllAbsensi();
+    const config  = getCfg();
+    const notifs  = getNotifs();
+
+    // Tulis semua data sekaligus ke Firebase
+    const allData = {
+      users, absensi, config, notifs,
+      initialized: true,
+      last_backup: DB.get('last_backup')||'',
+      auto_backups: DB.get('auto_backups')||[]
+    };
+
+    const ok = await FB.set('owl', allData);
+    if(ok){
+      toast('✅ Sync berhasil! Semua karyawan sekarang bisa login.','ok');
+      // Sembunyikan banner
+      const banner = document.getElementById('sync-banner');
+      if(banner) banner.style.display='none';
+      DB.setLocal('last_sync', new Date().toISOString());
+    } else {
+      toast('❗ Sync gagal. Cek koneksi internet.','er');
+    }
+  } catch(e){
+    toast('❗ Sync error: '+e.message,'er');
+  } finally {
+    if(btn){btn.disabled=false; btn.innerHTML='<i class="ti ti-cloud-upload"></i> Sync Semua Data ke Firebase Sekarang';}
+  }
+}
+
+// ── ADMIN DASHBOARD ───────────────────────────────────
+async function renderAdminDash(){
+  const users=getUsers(),absensi=getAllAbsensi(),today=new Date().toLocaleDateString('id-ID');
+  const krw=Object.entries(users).filter(([,u])=>u.role!=='admin');
+  let hadir=0,terlambat=0,belum=0;
+  krw.forEach(([uid])=>{const ab=(absensi[uid]||[]).find(a=>a.tgl===today&&a.tipe==='masuk');if(ab){if(ab.terlambat)terlambat++;else hadir++;}else belum++;});
+  document.getElementById('admin-stat').innerHTML=`
+    <div class="asc"><div class="asl">Total Karyawan</div><div class="asv" style="color:var(--bd)">${krw.length}</div></div>
+    <div class="asc"><div class="asl">Hadir</div><div class="asv" style="color:var(--gr)">${hadir}</div></div>
+    <div class="asc"><div class="asl">Terlambat</div><div class="asv" style="color:var(--am)">${terlambat}</div></div>
+    <div class="asc"><div class="asl">Belum Absen</div><div class="asv" style="color:var(--rd)">${belum}</div></div>`;
+  document.getElementById('emp-today').innerHTML=krw.length?krw.map(([uid,u])=>{
+    const ab=(absensi[uid]||[]).find(a=>a.tgl===today&&a.tipe==='masuk');
+    const st=ab?(ab.terlambat?'terlambat':'hadir'):'belum';
+    const ini=u.nama.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    return `<div class="emp-item"><div class="emp-av" style="background:${u.warna||'#0ea5e9'}">${ini}</div><div class="emp-tx"><div class="en">${u.nama}</div><div class="ed">${u.jab}${ab?' · masuk: '+ab.jam:''}</div></div><span class="bdg ${st==='hadir'?'bdg-g':st==='terlambat'?'bdg-a':'bdg-r'}">${st==='hadir'?'Hadir':st==='terlambat'?'Terlambat':'Belum'}</span></div>`;
+  }).join(''):'<div class="empty"><i class="ti ti-users"></i><p>Belum ada karyawan terdaftar</p></div>';
+
+  // Cek apakah data lokal sudah sync ke Firebase
+  const banner = document.getElementById('sync-banner');
+  if(banner && krw.length > 0){
+    try {
+      const fbUsers = await FB.get('owl/users');
+      const fbCount = fbUsers ? Object.keys(fbUsers).filter(k=>fbUsers[k]&&fbUsers[k].role!=='admin').length : 0;
+      // Tampilkan banner jika jumlah karyawan di lokal lebih banyak dari Firebase
+      banner.style.display = (krw.length > fbCount) ? 'block' : 'none';
+    } catch(e){ banner.style.display='block'; }
+  }
+}
+
+// ── ADMIN KARYAWAN ────────────────────────────────────
+function renderEmpList(){
+  const filter=(document.getElementById('srch')||{value:''}).value.toLowerCase();
+  const users=getUsers();
+  const list=Object.entries(users).filter(([,u])=>u.role!=='admin'&&(!filter||u.nama.toLowerCase().includes(filter)));
+  const el=document.getElementById('emp-list');if(!el)return;
+  if(!list.length){el.innerHTML='<div class="empty"><i class="ti ti-users"></i><p>Belum ada karyawan</p></div>';return;}
+  el.innerHTML=list.map(([uid,u])=>`
+    <div class="emp-item">
+      <div class="emp-av" style="background:${u.warna||'#0ea5e9'}">${u.nama.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
+      <div class="emp-tx"><div class="en">${u.nama}</div><div class="ed">${u.jab} · ${u.div||'-'} · ${u.id}</div></div>
+      <div style="display:flex;gap:6px">
+        <button class="ic-btn edit" onclick="editEmp('${uid}')"><i class="ti ti-edit"></i></button>
+        <button class="ic-btn del" onclick="hapusEmp('${uid}','${u.nama.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>
+      </div>
+    </div>`).join('');
+}
+
+let editEmpUid=null;
+function showAddEmp(){
+  guardAdmin(()=>{
+    editEmpUid=null;
+    document.getElementById('emp-form-title').textContent='Tambah Karyawan Baru';
+    document.getElementById('ef-pw-hint').style.display='none';
+    ['ef-nama','ef-jab','ef-div','ef-un','ef-pw'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('ef-warna').value='#0ea5e9';
+    openMd('mdEmp');
+  });
+}
+
+function editEmp(uid){
+  guardAdmin(()=>{
+    const u=getUsers()[uid];if(!u)return;
+    editEmpUid=uid;
+    document.getElementById('emp-form-title').textContent='Edit Data Karyawan';
+    document.getElementById('ef-pw-hint').style.display='';
+    document.getElementById('ef-nama').value=u.nama;
+    document.getElementById('ef-jab').value=u.jab;
+    document.getElementById('ef-div').value=u.div||'';
+    document.getElementById('ef-un').value=uid;
+    document.getElementById('ef-pw').value='';
+    document.getElementById('ef-warna').value=u.warna||'#0ea5e9';
+    openMd('mdEmp');
+  });
+}
+
+function saveEmp(){
+  guardAdmin(async ()=>{
+    const nama  = document.getElementById('ef-nama').value.trim();
+    const jab   = document.getElementById('ef-jab').value.trim();
+    const div   = document.getElementById('ef-div').value.trim();
+    const un    = document.getElementById('ef-un').value.trim().toLowerCase().replace(/\s+/g,'');
+    const pw    = document.getElementById('ef-pw').value;
+    const warna = document.getElementById('ef-warna').value;
+
+    if(!nama||!jab||!un){toast('❗ Nama, jabatan & username wajib diisi!','er');return;}
+    if(!editEmpUid && pw.length<4){toast('❗ Password min 4 karakter!','er');return;}
+
+    const btnSimpan = document.querySelector('#mdEmp .mk');
+    if(btnSimpan){btnSimpan.disabled=true; btnSimpan.textContent='Menyimpan...';}
+
+    try {
+      // Ambil users terbaru dari Firebase SDK
+      let users = await FB.get('owl/users') || getUsers();
+
+      if(editEmpUid){
+        if(un !== editEmpUid && users[un]){toast('❗ Username sudah dipakai!','er');return;}
+        const old = users[editEmpUid]||{};
+        const updated = {...old, nama, jab, div, warna};
+        if(pw.length>=4) updated.pw = pw;
+        // Simpan via Firebase SDK
+        const ok = await FB.set('owl/users/'+un, updated);
+        if(!ok) throw new Error('Gagal simpan ke Firebase');
+        if(un !== editEmpUid){
+          await FB.del('owl/users/'+editEmpUid);
+          delete users[editEmpUid];
+        }
+        users[un] = updated;
+        toast('✏️ Data karyawan berhasil diperbarui!','ok');
+
+      } else {
+        if(users[un]){toast('❗ Username sudah dipakai!','er');return;}
+        const newId = 'KRY-'+String(Object.keys(users).filter(k=>users[k]&&users[k].role!=='admin').length+1).padStart(3,'0');
+        const newUser = {pw, nama, jab, div, id:newId, role:'karyawan', warna};
+        // Simpan langsung ke path Firebase SDK
+        const ok = await FB.set('owl/users/'+un, newUser);
+        if(!ok) throw new Error('Gagal simpan ke Firebase');
+        users[un] = newUser;
+        toast('✅ Karyawan '+nama+' berhasil ditambahkan!','ok');
+      }
+
+      DB.setLocal('users', users);
+      closeMd('mdEmp');
+      renderEmpList();
+      renderAdminDash();
+      populateLapFilter();
+
+    } catch(err) {
+      toast('❗ Gagal menyimpan: '+err.message,'er');
+    } finally {
+      if(btnSimpan){btnSimpan.disabled=false; btnSimpan.textContent='Simpan';}
+    }
+  });
+}
+
+function hapusEmp(uid,nama){
+  guardAdmin(async ()=>{
+    if(!confirm('Hapus karyawan "'+nama+'"?\nSemua data absensinya juga akan dihapus permanen!'))return;
+    await FB.del('owl/users/'+uid);
+    await FB.del('owl/absensi/'+uid);
+    const users=getUsers(); delete users[uid]; DB.setLocal('users',users);
+    const ab=getAllAbsensi(); delete ab[uid]; DB.setLocal('absensi',ab);
+    renderEmpList(); renderAdminDash(); populateLapFilter();
+    toast('🗑️ Karyawan dihapus','ok');
+  });
+}
+
+// ── ADMIN LAPORAN ─────────────────────────────────────
+function populateLapFilter(){
+  const sel=document.getElementById('sel-bln');if(!sel)return;
+  const now=new Date();sel.innerHTML='';
+  for(let i=0;i<12;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const val=d.getFullYear()+'-'+(d.getMonth()+1);
+    sel.innerHTML+=`<option value="${val}">${BL[d.getMonth()]} ${d.getFullYear()}</option>`;
+  }
+  const selE=document.getElementById('sel-emp');if(!selE)return;
+  const users=getUsers();
+  selE.innerHTML='<option value="all">Semua Karyawan</option>';
+  Object.entries(users).filter(([,u])=>u.role!=='admin').forEach(([uid,u])=>{
+    selE.innerHTML+=`<option value="${uid}">${u.nama}</option>`;
+  });
+  renderLap();
+}
+
+function renderLap(){
+  const selB=document.getElementById('sel-bln');if(!selB||!selB.value)return;
+  const[thn,bln]=selB.value.split('-').map(Number);
+  const empF=(document.getElementById('sel-emp')||{value:'all'}).value;
+  const users=getUsers(),absensi=getAllAbsensi(),cfg=getCfg();
+  let rows=Object.entries(users).filter(([,u])=>u.role!=='admin');
+  if(empF!=='all')rows=rows.filter(([uid])=>uid===empF);
+  const fmt=v=>'Rp '+v.toLocaleString('id-ID');
+  let gtotal=0,gjam=0;
+  document.getElementById('lap-body').innerHTML=rows.map(([uid,u])=>{
+    const list=(absensi[uid]||[]).filter(r=>{const d=new Date(r.ms);return d.getFullYear()===thn&&d.getMonth()+1===bln&&r.tipe==='masuk';});
+    // durasiMs sudah efektif (dipotong istirahat)
+    const jam =Math.round(list.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000*10)/10;
+    const hari=list.length, gaji=Math.round(jam*cfg.tarifJam);
+    gtotal+=gaji; gjam+=jam;
+    return `<tr>
+      <td style="font-weight:700;font-size:11px">${u.nama.split(' ')[0]}</td>
+      <td>${hari}</td>
+      <td title="Jam efektif (sudah dipotong istirahat)">${jam}</td>
+      <td style="color:#0369a1;font-weight:700">${fmt(gaji)}</td>
+      <td><span class="bdg bdg-g">Aktif</span></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('lap-total-n').textContent=fmt(gtotal);
+  const iLabel=cfg.istirahatMulai?' (efektif, sudah dipotong istirahat '+cfg.istirahatMulai+'–'+cfg.istirahatSelesai+')':'';
+  document.getElementById('lap-total-d').textContent=rows.length+' karyawan · '+Math.round(gjam*10)/10+' jam'+iLabel;
+}
+
+function exportCSV(){
+  guardAdmin(()=>{
+    const selB=document.getElementById('sel-bln');
+    const[thn,bln]=selB.value.split('-').map(Number);
+    const blnNm=BL[bln-1]+' '+thn;
+    const empF=(document.getElementById('sel-emp')||{value:'all'}).value;
+    const users=getUsers(),absensi=getAllAbsensi(),cfg=getCfg();
+    let rows=Object.entries(users).filter(([,u])=>u.role!=='admin');
+    if(empF!=='all')rows=rows.filter(([uid])=>uid===empF);
+    const fmt=v=>'Rp '+v.toLocaleString('id-ID');
+    const lines=[
+      [cfg.perusahaan+' - Laporan Absensi '+blnNm],[''],
+      ['Nama','Divisi','Hari Kerja','Total Jam (jam)','Total Gaji (Rp)','Tarif/Jam (Rp)'],
+      ...rows.map(([uid,u])=>{
+        const list=(absensi[uid]||[]).filter(r=>{const d=new Date(r.ms);return d.getFullYear()===thn&&d.getMonth()+1===bln&&r.tipe==='masuk';});
+        const jam=Math.round(list.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000*10)/10;
+        return[u.nama,u.div||'-',list.length,jam,Math.round(jam*cfg.tarifJam),cfg.tarifJam];
+      }),[''],
+      ['TOTAL','',rows.reduce((s,[uid])=>(absensi[uid]||[]).filter(r=>{const d=new Date(r.ms);return d.getFullYear()===thn&&d.getMonth()+1===bln&&r.tipe==='masuk';}).length+s,0),
+       Math.round(rows.reduce((s,[uid])=>(absensi[uid]||[]).filter(r=>{const d=new Date(r.ms);return d.getFullYear()===thn&&d.getMonth()+1===bln&&r.tipe==='masuk';}).reduce((ss,r)=>ss+(r.durasiMs||0),0)+s,0)/3600000*10)/10,
+       rows.reduce((s,[uid])=>{const list=(absensi[uid]||[]).filter(r=>{const d=new Date(r.ms);return d.getFullYear()===thn&&d.getMonth()+1===bln&&r.tipe==='masuk';});return s+Math.round(list.reduce((ss,r)=>ss+(r.durasiMs||0),0)/3600000*cfg.tarifJam);},0),'']
+    ];
+    const csv=lines.map(r=>r.join(',')).join('\n');
+    const a=document.createElement('a');
+    a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+    a.download='owl_laporan_'+blnNm.replace(' ','_')+'.csv';a.click();
+    toast('📊 CSV berhasil didownload!','ok');
+  });
+}
+
+function exportPDF(){guardAdmin(()=>{toast('🖨️ Membuka dialog cetak...','ok');setTimeout(()=>window.print(),600);});}
+
+// ── SETTING ───────────────────────────────────────────
+function loadSetting(){
+  const cfg=getCfg();
+  document.getElementById('cfg-perusahaan').value        = cfg.perusahaan||'';
+  document.getElementById('cfg-alamat').value            = cfg.alamat||'';
+  document.getElementById('cfg-nama1').value             = cfg.namaLokasi1||'Kantor Pusat';
+  document.getElementById('cfg-lat').value               = cfg.latKantor||'';
+  document.getElementById('cfg-lon').value               = cfg.lonKantor||'';
+  document.getElementById('cfg-nama2').value             = cfg.namaLokasi2||'';
+  document.getElementById('cfg-lat2').value              = cfg.latKantor2||'';
+  document.getElementById('cfg-lon2').value              = cfg.lonKantor2||'';
+  const radius = cfg.radiusAbsen||200;
+  document.getElementById('cfg-radius').value            = radius;
+  document.getElementById('radius-val').textContent      = radius+' meter';
+  document.getElementById('cfg-jam-masuk').value         = cfg.jamMasuk||'08:00';
+  document.getElementById('cfg-jam-keluar').value        = cfg.jamKeluar||'17:00';
+  document.getElementById('cfg-istirahat-mulai').value   = cfg.istirahatMulai||'12:00';
+  document.getElementById('cfg-istirahat-selesai').value = cfg.istirahatSelesai||'13:00';
+  document.getElementById('cfg-tarif').value             = cfg.tarifJam||12500;
+  if(cfg.latKantor&&cfg.lonKantor)   updatePreviewKoordinat(cfg.latKantor,cfg.lonKantor,1);
+  if(cfg.latKantor2&&cfg.lonKantor2) updatePreviewKoordinat(cfg.latKantor2,cfg.lonKantor2,2);
+  updateInfoIstirahat();
+  updatePreviewGaji();
+  // Tampilkan riwayat backup otomatis
+  const bkEl=document.getElementById('backup-list');
+  if(bkEl){
+    const backups=DB.get('auto_backups')||[];
+    const lastBk=DB.get('last_backup');
+    if(!backups.length){
+      bkEl.textContent='Belum ada backup otomatis';
+    } else {
+      bkEl.innerHTML=backups.map((b,i)=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--br)">
+          <span>${b.tgl} ${i===0?'<span style="background:#dcfce7;color:#15803d;font-size:9px;padding:1px 5px;border-radius:4px;margin-left:4px">Terbaru</span>':''}</span>
+          <button onclick="downloadBackupAuto(${i})" style="background:var(--bl);color:var(--bd);border:none;border-radius:5px;padding:2px 8px;font-size:10px;cursor:pointer">⬇ Unduh</button>
+        </div>`).join('');
+    }
+  }
+}
+
+function saveSetting(){
+  guardAdmin(async ()=>{
+    const val=(id,def='')=>{const el=document.getElementById(id);return el?el.value:def;};
+    const lat=val('cfg-lat').trim(), lon=val('cfg-lon').trim();
+    const lat2=val('cfg-lat2').trim(), lon2=val('cfg-lon2').trim();
+    const valKoord=(la,lo,nm)=>{
+      if(la&&(isNaN(parseFloat(la))||parseFloat(la)<-90||parseFloat(la)>90)){toast('❗ Latitude '+nm+' tidak valid!','er');return false;}
+      if(lo&&(isNaN(parseFloat(lo))||parseFloat(lo)<-180||parseFloat(lo)>180)){toast('❗ Longitude '+nm+' tidak valid!','er');return false;}
+      return true;
+    };
+    if(!valKoord(lat,lon,'Lokasi 1')||!valKoord(lat2,lon2,'Lokasi 2')) return;
+    const iMulai=val('cfg-istirahat-mulai','12:00'), iSelesai=val('cfg-istirahat-selesai','13:00');
+    if(iMulai>=iSelesai){toast('❗ Jam selesai istirahat harus setelah jam mulai!','er');return;}
+    const cfg={
+      perusahaan:val('cfg-perusahaan')||'Perusahaan Anda', alamat:val('cfg-alamat'),
+      namaLokasi1:val('cfg-nama1')||'Kantor Pusat',
+      latKantor:lat?parseFloat(lat).toFixed(6):'', lonKantor:lon?parseFloat(lon).toFixed(6):'',
+      namaLokasi2:val('cfg-nama2'), latKantor2:lat2?parseFloat(lat2).toFixed(6):'', lonKantor2:lon2?parseFloat(lon2).toFixed(6):'',
+      radiusAbsen:parseInt(val('cfg-radius','200'))||200,
+      jamMasuk:val('cfg-jam-masuk','08:00'), jamKeluar:val('cfg-jam-keluar','17:00'),
+      istirahatMulai:iMulai, istirahatSelesai:iSelesai,
+      tarifJam:parseInt(val('cfg-tarif','12500'))||12500
+    };
+    DB.setLocal('config',cfg);
+    await FB.set('owl/config', cfg);
+    const tEl=document.getElementById('g-tarif'); if(tEl) tEl.textContent='Rp '+cfg.tarifJam.toLocaleString('id-ID');
+    const iEl=document.getElementById('info-tarif'); if(iEl) iEl.textContent=cfg.tarifJam.toLocaleString('id-ID');
+    if(lat&&lon) updatePreviewKoordinat(cfg.latKantor,cfg.lonKantor,1);
+    if(lat2&&lon2) updatePreviewKoordinat(cfg.latKantor2,cfg.lonKantor2,2);
+    updateInfoIstirahat(); updatePreviewGaji();
+    toast('✅ Pengaturan berhasil disimpan!','ok');
+  });
+}
+
+// Preview info istirahat
+function updateInfoIstirahat(){
+  const m=document.getElementById('cfg-istirahat-mulai');
+  const s=document.getElementById('cfg-istirahat-selesai');
+  const el=document.getElementById('info-istirahat');
+  if(!m||!s||!el) return;
+  const [mH,mM]=m.value.split(':').map(Number);
+  const [sH,sM]=s.value.split(':').map(Number);
+  const menit=(sH*60+sM)-(mH*60+mM);
+  el.textContent=m.value+'–'+s.value+' ('+menit+' menit)';
+}
+
+// Preview estimasi gaji harian
+function updatePreviewGaji(){
+  const el=document.getElementById('preview-gaji-harian');
+  if(!el) return;
+  const masuk   = (document.getElementById('cfg-jam-masuk')||{value:'08:00'}).value;
+  const keluar  = (document.getElementById('cfg-jam-keluar')||{value:'17:00'}).value;
+  const iMulai  = (document.getElementById('cfg-istirahat-mulai')||{value:'12:00'}).value;
+  const iSeles  = (document.getElementById('cfg-istirahat-selesai')||{value:'13:00'}).value;
+  const tarif   = parseInt((document.getElementById('cfg-tarif')||{value:'12500'}).value)||12500;
+  const [mH,mM] = masuk.split(':').map(Number);
+  const [kH,kM] = keluar.split(':').map(Number);
+  const [iH,IM] = iMulai.split(':').map(Number);
+  const [isH,isM]= iSeles.split(':').map(Number);
+  const totalMenit = (kH*60+kM)-(mH*60+mM);
+  const isMenit    = (isH*60+isM)-(iH*60+IM);
+  const kerjaMenit = Math.max(0, totalMenit-isMenit);
+  const jamKerja   = Math.round(kerjaMenit/60*10)/10;
+  const gaji       = Math.round(jamKerja*tarif);
+  el.textContent   = jamKerja+' jam kerja efektif × Rp '+tarif.toLocaleString('id-ID')+' = Rp '+gaji.toLocaleString('id-ID');
+}
+
+// Ambil koordinat untuk lokasi 1 atau 2
+function ambilKoordinatKantor(no){
+  if(!navigator.geolocation){toast('❗ GPS tidak tersedia','er');return;}
+  toast('📡 Mengambil koordinat untuk Lokasi '+no+'...');
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      const lat=pos.coords.latitude.toFixed(6);
+      const lon=pos.coords.longitude.toFixed(6);
+      if(no===1){
+        document.getElementById('cfg-lat').value=lat;
+        document.getElementById('cfg-lon').value=lon;
+        updatePreviewKoordinat(lat,lon,1);
+      } else {
+        document.getElementById('cfg-lat2').value=lat;
+        document.getElementById('cfg-lon2').value=lon;
+        updatePreviewKoordinat(lat,lon,2);
+      }
+      toast('📍 Koordinat Lokasi '+no+' berhasil diambil!','ok');
+    },
+    err=>{toast('❗ GPS gagal: '+(err.code===1?'izin ditolak':err.code===2?'sinyal lemah':'timeout'),'er');},
+    {timeout:10000,enableHighAccuracy:true}
+  );
+}
+
+function updatePreviewKoordinat(lat,lon,no){
+  const sfx  = no===2?'2':'';
+  const el   = document.getElementById('preview-koordinat'+sfx);
+  const txt  = document.getElementById('preview-koordinat-text'+sfx);
+  const lnk  = document.getElementById('preview-maps-link'+sfx);
+  if(!el||!lat||!lon){if(el)el.style.display='none';return;}
+  const cfg = getCfg();
+  const nm  = no===2?(cfg.namaLokasi2||'Lokasi 2'):(cfg.namaLokasi1||'Lokasi 1');
+  txt.textContent='📍 '+nm+': '+lat+', '+lon;
+  lnk.href=`https://www.google.com/maps?q=${lat},${lon}&z=17`;
+  el.style.display='block';
+}
+
+// ── HITUNG JARAK (Haversine) ──────────────────────────
+function hitungJarak(lat1,lon1,lat2,lon2){
+  const R=6371000;
+  const dLat=(lat2-lat1)*Math.PI/180;
+  const dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)*Math.sin(dLat/2)+
+    Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*
+    Math.sin(dLon/2)*Math.sin(dLon/2);
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// ── CEK RADIUS — cek ke KEDUA lokasi ─────────────────
+function cekRadius(){
+  const cfg=getCfg();
+  if(!lokasiData||lokasiData.acc===0) return {ok:true};
+  const ada1=cfg.latKantor&&cfg.lonKantor;
+  const ada2=cfg.latKantor2&&cfg.lonKantor2;
+  if(!ada1&&!ada2) return {ok:true}; // tidak ada lokasi = bebas
+  const lat=parseFloat(lokasiData.lat), lon=parseFloat(lokasiData.lon);
+  const radius=cfg.radiusAbsen||200;
+  let closest=null, closestName='', closestDist=Infinity;
+  if(ada1){
+    const d=Math.round(hitungJarak(lat,lon,parseFloat(cfg.latKantor),parseFloat(cfg.lonKantor)));
+    if(d<closestDist){closestDist=d;closestName=cfg.namaLokasi1||'Kantor Pusat';closest=1;}
+    if(d<=radius) return {ok:true, jarak:d, lokasi:cfg.namaLokasi1||'Kantor Pusat'};
+  }
+  if(ada2){
+    const d=Math.round(hitungJarak(lat,lon,parseFloat(cfg.latKantor2),parseFloat(cfg.lonKantor2)));
+    if(d<closestDist){closestDist=d;closestName=cfg.namaLokasi2||'Kantor Cabang';closest=2;}
+    if(d<=radius) return {ok:true, jarak:d, lokasi:cfg.namaLokasi2||'Kantor Cabang'};
+  }
+  return {ok:false, jarak:closestDist, radius, lokasiTerdekat:closestName, noTerdekat:closest};
+}
+
+// ── HITUNG DURASI KERJA EFEKTIF (kurangi istirahat) ──
+function hitungDurasiEfektif(msStart, msEnd, cfg){
+  if(!msStart||!msEnd||msEnd<=msStart)return 0;
+  const iMulai   = cfg.istirahatMulai  ||'12:00';
+  const iSelesai = cfg.istirahatSelesai||'13:00';
+  const startD   = new Date(msStart);
+  // Gunakan tahun/bulan/tanggal dari tanggal masuk (fix timezone)
+  const thn=startD.getFullYear(), bln=startD.getMonth(), tgl=startD.getDate();
+  const [iH,iM]  = iMulai.split(':').map(Number);
+  const [isH,isM]= iSelesai.split(':').map(Number);
+  // Buat waktu istirahat menggunakan komponen tanggal yang sama
+  const isStart  = new Date(thn,bln,tgl,iH,iM,0).getTime();
+  const isEnd    = new Date(thn,bln,tgl,isH,isM,0).getTime();
+  // Hitung irisan waktu kerja dengan waktu istirahat
+  const overlapStart = Math.max(msStart, isStart);
+  const overlapEnd   = Math.min(msEnd,   isEnd);
+  const overlap      = Math.max(0, overlapEnd - overlapStart);
+  return msEnd - msStart - overlap;
+}
+
+function gantiPw(){
+  guardAdmin(async ()=>{
+    const old=document.getElementById('pw-old').value;
+    const nw=document.getElementById('pw-new').value;
+    const cf=document.getElementById('pw-confirm').value;
+    const users=getUsers();
+    if(users['admin'].pw!==old){toast('❗ Password lama salah!','er');return;}
+    if(nw.length<6){toast('❗ Password baru min 6 karakter!','er');return;}
+    if(nw!==cf){toast('❗ Konfirmasi tidak cocok!','er');return;}
+    users['admin'].pw=nw;
+    DB.setLocal('users',users);
+    await FB.set('owl/users/admin/pw', nw);
+    ['pw-old','pw-new','pw-confirm'].forEach(id=>document.getElementById(id).value='');
+    toast('🔐 Password berhasil diganti!','ok');
+  });
+}
+
+// ── BACKUP ────────────────────────────────────────────
+function downloadBackupAuto(idx){
+  const backups=DB.get('auto_backups')||[];
+  if(!backups[idx])return;
+  const a=document.createElement('a');
+  a.href='data:application/json;charset=utf-8,'+encodeURIComponent(backups[idx].data);
+  a.download='owl_backup_'+backups[idx].tgl.replace(/\//g,'-')+'.json';
+  a.click();
+  toast('💾 Backup '+backups[idx].tgl+' didownload!','ok');
+}
+
+function exportBackup(){
+  guardAdmin(()=>{
+    const data={users:DB.get('users'),absensi:DB.get('absensi'),notifs:DB.get('notifs'),config:DB.get('config'),exported:new Date().toISOString(),v:'2.0'};
+    const a=document.createElement('a');
+    a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(data,null,2));
+    a.download='owl_backup_'+new Date().toLocaleDateString('id-ID').replace(/\//g,'-')+'.json';a.click();
+    toast('💾 Backup berhasil didownload!','ok');
+  });
+}
+
+function doImport(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      if(!data.users)throw new Error();
+      if(!confirm('Import akan MENIMPA semua data saat ini.\nLanjutkan?'))return;
+      if(data.users)DB.setLocal('users',data.users);
+      if(data.absensi)DB.setLocal('absensi',data.absensi);
+      if(data.notifs)DB.setLocal('notifs',data.notifs);
+      if(data.config)DB.setLocal('config',data.config);
+      toast('✅ Import berhasil! Silakan login ulang.','ok');
+      setTimeout(doLogout,1500);
+    }catch{toast('❗ File backup tidak valid!','er');}
+  };
+  reader.readAsText(file);e.target.value='';
+}
+
+function resetData(){
+  guardAdmin(()=>{
+    if(!confirm('⚠️ HAPUS SEMUA DATA?\n\nTindakan ini TIDAK BISA dibatalkan!\nSemua data karyawan dan absensi akan hilang.'))return;
+    ['users','absensi','notifs','config','initialized'].forEach(k=>DB.del(k));
+    toast('Data direset. Memuat ulang...','warn');
+    setTimeout(()=>location.reload(),1500);
+  });
+}
+
+// ── FOTO PREVIEW ──────────────────────────────────────
+function previewFoto(src){document.getElementById('fotoPrevImg').src=src;document.getElementById('fotoPrev').classList.add('on');}
+function closeFotoPrev(){document.getElementById('fotoPrev').classList.remove('on');}
+
+// ── PWA ───────────────────────────────────────────────
+function initPWA(){
+  const mf={name:'OWL Absensi Karyawan',short_name:'OWL',display:'standalone',background_color:'#0ea5e9',theme_color:'#0ea5e9',start_url:'./',orientation:'portrait',
+    icons:[{src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='36' fill='%230ea5e9'/%3E%3Ctext x='96' y='130' font-size='100' text-anchor='middle'%3E%F0%9F%A6%89%3C/text%3E%3C/svg%3E",sizes:'192x192',type:'image/svg+xml'},
+             {src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%230ea5e9'/%3E%3Ctext x='256' y='360' font-size='280' text-anchor='middle'%3E%F0%9F%A6%89%3C/text%3E%3C/svg%3E",sizes:'512x512',type:'image/svg+xml'}]};
+  const l=document.createElement('link');l.rel='manifest';l.href='/manifest.json';document.head.appendChild(l);
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  }
+  let dp=null;
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e;document.getElementById('install-banner').style.display='flex';});
+  document.getElementById('btn-install').addEventListener('click',()=>{if(dp){dp.prompt();dp.userChoice.then(()=>{dp=null;document.getElementById('install-banner').style.display='none';});}});
+  document.getElementById('btn-install-close').addEventListener('click',()=>document.getElementById('install-banner').style.display='none');
+  window.addEventListener('appinstalled',()=>{document.getElementById('install-banner').style.display='none';toast('🎉 OWL berhasil diinstall!','ok');});
+}
+
+// ── SESSION PERSIST (tetap login setelah refresh) ────
+// Simpan session ke sessionStorage (hilang saat tab ditutup, tapi tetap saat refresh)
+function saveSession(user){
+  try{sessionStorage.setItem('owl_session',JSON.stringify({username:user.username,ts:Date.now()}));}catch(e){}
+}
+function loadSession(){
+  try{
+    const s=JSON.parse(sessionStorage.getItem('owl_session'));
+    if(!s)return null;
+    // Session berlaku max 12 jam
+    if(Date.now()-s.ts > 12*3600*1000){sessionStorage.removeItem('owl_session');return null;}
+    const users=getUsers();
+    if(users[s.username]){return {...users[s.username],username:s.username};}
+    return null;
+  }catch(e){return null;}
+}
+function clearSession(){
+  try{sessionStorage.removeItem('owl_session');}catch(e){}
+}
+
+// ── BACKUP OTOMATIS HARIAN ───────────────────────────
+function cekBackupHarian(){
+  if(!DB.get('initialized'))return; // jangan backup kalau belum ada data
+  const today=new Date().toLocaleDateString('id-ID');
+  const lastBackup=DB.get('last_backup');
+  if(lastBackup===today)return;
+  const data={
+    users   :DB.get('users'),
+    absensi :DB.get('absensi'),
+    notifs  :DB.get('notifs'),
+    config  :DB.get('config'),
+    exported:new Date().toISOString(),
+    v       :'2.0-auto'
+  };
+  const backups=DB.get('auto_backups')||[];
+  backups.unshift({tgl:today,data:JSON.stringify(data)});
+  DB.setLocal('auto_backups',backups.slice(0,7));
+  DB.setLocal('last_backup',today);
+  // Download otomatis HANYA jika admin sudah login
+  if(curUser && curUser.role==='admin'){
+    setTimeout(()=>{
+      const a=document.createElement('a');
+      a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(data,null,2));
+      a.download='owl_backup_auto_'+today.replace(/\//g,'-')+'.json';
+      a.click();
+      toast('💾 Backup harian otomatis tersimpan!','ok');
+    },3000);
+  }
+}
+
+// ── START ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async ()=>{
+  tick(); initPWA();
+
+  // Live update info istirahat & preview gaji
+  ['cfg-istirahat-mulai','cfg-istirahat-selesai'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.addEventListener('change',()=>{updateInfoIstirahat();updatePreviewGaji();});}
+  });
+  ['cfg-jam-masuk','cfg-jam-keluar','cfg-tarif'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.addEventListener('change',updatePreviewGaji);}
+  });
+
+  // Init Firebase + load data
+  await initData();
+
+  // Cek session aktif (tidak keluar saat refresh)
+  const sess = loadSession();
+  if(sess){
+    curUser = sess;
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app-screen').style.display='block';
+    document.getElementById('first-box').style.display='none';
+    initApp();
+    cekBackupHarian();
+  } else {
+    document.getElementById('uname').focus();
+  }
+});
+</script>
+</body>
+</html>
