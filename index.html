@@ -350,8 +350,14 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
     <div id="ad-dashboard">
       <div id="sync-banner" style="background:#fef3c7;border:1px solid #fde68a;border-radius:12px;padding:12px;margin-bottom:12px;display:none">
         <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:6px">⚠️ Data belum tersinkron ke server</div>
-        <div style="font-size:11px;color:#b45309;margin-bottom:10px">Data karyawan tersimpan lokal di HP ini. Klik tombol di bawah untuk sinkronisasi ke Firebase agar semua HP bisa login.</div>
-        <button class="btn btn-b" style="margin-bottom:0;padding:10px" onclick="syncKeFirebase()"><i class="ti ti-cloud-upload"></i> Sync Semua Data ke Firebase Sekarang</button>
+        <div style="font-size:11px;color:#b45309;margin-bottom:10px">Data karyawan tersimpan lokal. Klik tombol di bawah untuk sinkronisasi ke Firebase.</div>
+        <button class="btn btn-b" style="margin-bottom:0;padding:10px" onclick="syncKeFirebase()"><i class="ti ti-cloud-upload"></i> Sync Semua Data ke Firebase</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="sec" style="margin-bottom:0"><i class="ti ti-dashboard"></i> Dashboard Hari Ini</div>
+        <button onclick="refreshDashboard()" style="background:var(--bl);color:var(--bd);border:1px solid var(--br);border-radius:9px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px">
+          <i class="ti ti-refresh" style="font-size:13px"></i> Refresh
+        </button>
       </div>
       <div class="admin-stat" id="admin-stat"></div>
       <div class="sec"><i class="ti ti-users"></i> Status Karyawan Hari Ini</div>
@@ -608,7 +614,7 @@ const DB = {
 async function initData(){
   showLoading('Menghubungkan ke server...');
   try {
-    const data = await FB.get('owl');
+    const data = await FB.get('');
     if(data){
       Object.keys(data).forEach(k => DB.setLocal(k, data[k]));
       if(!data.initialized) await initDataBaru();
@@ -628,7 +634,7 @@ async function initDataBaru(){
     absensi:{}, notifs:[], initialized:true,
     config:{tarifJam:12500,jamMasuk:'08:00',jamKeluar:'17:00',perusahaan:'Perusahaan Anda',alamat:''}
   };
-  await FB.set('owl', def);
+  await FB.set('', def);
   Object.keys(def).forEach(k => DB.setLocal(k, def[k]));
   document.getElementById('first-box').style.display='block';
 }
@@ -711,20 +717,22 @@ const getAllAbsensi= () => DB.get('absensi') || {};
 const getUserAbs  = uid => (getAllAbsensi()[uid]) || [];
 
 async function saveUserAbs(uid, list){
+  // Simpan ke cache lokal
   const a = getAllAbsensi();
-  a[uid] = list;
+  a[uid]  = list;
   DB.setLocal('absensi', a);
-  await FB.set('owl/absensi', a);
+  // Simpan ke Firebase — hanya path karyawan ini agar lebih cepat & tidak overwrite data lain
+  await FB.set('absensi/'+uid, list);
 }
 
 async function saveNotifs(list){
   DB.setLocal('notifs', list);
-  await FB.set('owl/notifs', list);
+  await FB.set('notifs', list);
 }
 
 async function saveConfig(cfg){
   DB.setLocal('config', cfg);
-  await FB.set('owl/config', cfg);
+  await FB.set('config', cfg);
 }
 
 // ── SESSION ───────────────────────────────────────────
@@ -767,7 +775,7 @@ async function doLogin(){
   try {
     // Ambil data users terbaru dari Firebase SDK
     let users = getUsers();
-    const freshUsers = await FB.get('owl/users');
+    const freshUsers = await FB.get('users');
     if(freshUsers){
       users = freshUsers;
       DB.setLocal('users', freshUsers);
@@ -1274,28 +1282,33 @@ function renderRiwayat(){
 }
 
 // ── GAJI ──────────────────────────────────────────────
-function calcGaji(){
-  const cfg=getCfg();
-  const list=getUserAbs(curUser.username);
-  const n=new Date(),bln=n.getMonth(),thn=n.getFullYear();
-  const bList=list.filter(r=>{const d=new Date(r.ms);return d.getMonth()===bln&&d.getFullYear()===thn&&r.tipe==='masuk';});
-  // durasiMs sudah efektif (dipotong istirahat) sejak konfirmasi
-  const totMs   = bList.reduce((s,r)=>s+(r.durasiMs||0),0);
-  const totJam  = Math.round(totMs/3600000*10)/10;
-  const totHari = bList.length;
-  const total   = Math.round(totJam*cfg.tarifJam);
-  const fmt=v=>'Rp '+v.toLocaleString('id-ID');
-  // hitung total menit istirahat terpotong bulan ini
-  const totPotong = bList.reduce((s,r)=>s+((r.durasiTotal||0)-(r.durasiMs||0)),0);
-  const potongMnt = Math.round(totPotong/60000);
+async function calcGaji(){
+  // Ambil data absensi terbaru dari Firebase
+  const fbAbs = await FB.get('absensi/'+curUser.username);
+  if(fbAbs){ DB.setLocal('absensi', {...getAllAbsensi(), [curUser.username]: fbAbs}); }
+  const fbCfg = await FB.get('config');
+  const cfg   = fbCfg || getCfg();
+  if(fbCfg) DB.setLocal('config', fbCfg);
+
+  const list  = fbAbs || getUserAbs(curUser.username);
+  const n     = new Date(), bln=n.getMonth(), thn=n.getFullYear();
+  const bList = list.filter(r=>{const d=new Date(r.ms);return d.getMonth()===bln&&d.getFullYear()===thn&&r.tipe==='masuk';});
+  const totMs    = bList.reduce((s,r)=>s+(r.durasiMs||0),0);
+  const totJam   = Math.round(totMs/3600000*10)/10;
+  const totHari  = bList.length;
+  const total    = Math.round(totJam*cfg.tarifJam);
+  const fmt      = v=>'Rp '+v.toLocaleString('id-ID');
+  const totPotong= bList.reduce((s,r)=>s+((r.durasiTotal||0)-(r.durasiMs||0)),0);
+  const potongMnt= Math.round(totPotong/60000);
 
   document.getElementById('g-total').textContent  = fmt(total);
   document.getElementById('g-det').textContent    = totJam+' jam efektif × '+fmt(cfg.tarifJam)+'/jam';
   document.getElementById('g-hari').textContent   = totHari+' hari';
   document.getElementById('g-jam').textContent    = totJam+' jam';
   document.getElementById('g-total2').textContent = fmt(total);
+  document.getElementById('g-tarif').textContent  = fmt(cfg.tarifJam);
+  document.getElementById('info-tarif').textContent = cfg.tarifJam.toLocaleString('id-ID');
 
-  // Rincian per minggu
   const wk=['Minggu 1 (1–7)','Minggu 2 (8–14)','Minggu 3 (15–21)','Minggu 4 (22–31)'];
   const wMs=[0,0,0,0];
   bList.forEach(r=>{const d=new Date(r.ms).getDate();wMs[d<=7?0:d<=14?1:d<=21?2:3]+=(r.durasiMs||0);});
@@ -1355,7 +1368,7 @@ async function syncKeFirebase(){
       auto_backups: DB.get('auto_backups')||[]
     };
 
-    const ok = await FB.set('owl', allData);
+    const ok = await FB.set('', allData);
     if(ok){
       toast('✅ Sync berhasil! Semua karyawan sekarang bisa login.','ok');
       // Sembunyikan banner
@@ -1372,34 +1385,49 @@ async function syncKeFirebase(){
   }
 }
 
+async function refreshDashboard(){
+  toast('🔄 Memuat data terbaru...','');
+  await renderAdminDash();
+  toast('✅ Data berhasil diperbarui!','ok');
+}
+
 // ── ADMIN DASHBOARD ───────────────────────────────────
 async function renderAdminDash(){
-  const users=getUsers(),absensi=getAllAbsensi(),today=new Date().toLocaleDateString('id-ID');
-  const krw=Object.entries(users).filter(([,u])=>u.role!=='admin');
+  // Ambil data terbaru dari Firebase
+  const [fbUsers, fbAbsensi] = await Promise.all([FB.get('users'), FB.get('absensi')]);
+  const users   = fbUsers   || getUsers();
+  const absensi = fbAbsensi || getAllAbsensi();
+  if(fbUsers)   DB.setLocal('users',   fbUsers);
+  if(fbAbsensi) DB.setLocal('absensi', fbAbsensi);
+
+  const today = new Date().toLocaleDateString('id-ID');
+  const krw   = Object.entries(users).filter(([,u])=>u.role!=='admin');
   let hadir=0,terlambat=0,belum=0;
-  krw.forEach(([uid])=>{const ab=(absensi[uid]||[]).find(a=>a.tgl===today&&a.tipe==='masuk');if(ab){if(ab.terlambat)terlambat++;else hadir++;}else belum++;});
+  krw.forEach(([uid])=>{
+    const ab=(absensi[uid]||[]).find(a=>a.tgl===today&&a.tipe==='masuk');
+    if(ab){if(ab.terlambat)terlambat++;else hadir++;}else belum++;
+  });
   document.getElementById('admin-stat').innerHTML=`
     <div class="asc"><div class="asl">Total Karyawan</div><div class="asv" style="color:var(--bd)">${krw.length}</div></div>
     <div class="asc"><div class="asl">Hadir</div><div class="asv" style="color:var(--gr)">${hadir}</div></div>
     <div class="asc"><div class="asl">Terlambat</div><div class="asv" style="color:var(--am)">${terlambat}</div></div>
     <div class="asc"><div class="asl">Belum Absen</div><div class="asv" style="color:var(--rd)">${belum}</div></div>`;
   document.getElementById('emp-today').innerHTML=krw.length?krw.map(([uid,u])=>{
-    const ab=(absensi[uid]||[]).find(a=>a.tgl===today&&a.tipe==='masuk');
-    const st=ab?(ab.terlambat?'terlambat':'hadir'):'belum';
+    const abList=absensi[uid]||[];
+    const ab =abList.find(a=>a.tgl===today&&a.tipe==='masuk');
+    const abK=abList.find(a=>a.tgl===today&&a.tipe==='keluar');
+    const st =ab?(ab.terlambat?'terlambat':'hadir'):'belum';
     const ini=u.nama.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    return `<div class="emp-item"><div class="emp-av" style="background:${u.warna||'#0ea5e9'}">${ini}</div><div class="emp-tx"><div class="en">${u.nama}</div><div class="ed">${u.jab}${ab?' · masuk: '+ab.jam:''}</div></div><span class="bdg ${st==='hadir'?'bdg-g':st==='terlambat'?'bdg-a':'bdg-r'}">${st==='hadir'?'Hadir':st==='terlambat'?'Terlambat':'Belum'}</span></div>`;
-  }).join(''):'<div class="empty"><i class="ti ti-users"></i><p>Belum ada karyawan terdaftar</p></div>';
-
-  // Cek apakah data lokal sudah sync ke Firebase
-  const banner = document.getElementById('sync-banner');
-  if(banner && krw.length > 0){
-    try {
-      const fbUsers = await FB.get('owl/users');
-      const fbCount = fbUsers ? Object.keys(fbUsers).filter(k=>fbUsers[k]&&fbUsers[k].role!=='admin').length : 0;
-      // Tampilkan banner jika jumlah karyawan di lokal lebih banyak dari Firebase
-      banner.style.display = (krw.length > fbCount) ? 'block' : 'none';
-    } catch(e){ banner.style.display='block'; }
-  }
+    const dur=ab&&ab.durasi?' · '+ab.durasi:'';
+    return `<div class="emp-item">
+      <div class="emp-av" style="background:${u.warna||'#0ea5e9'}">${ini}</div>
+      <div class="emp-tx"><div class="en">${u.nama}</div>
+      <div class="ed">${u.jab}${ab?' · masuk: '+ab.jam:''}${abK?' · keluar: '+abK.jam:''}${dur}</div></div>
+      <span class="bdg ${st==='hadir'?'bdg-g':st==='terlambat'?'bdg-a':'bdg-r'}">${st==='hadir'?'Hadir':st==='terlambat'?'Terlambat':'Belum'}</span>
+    </div>`;
+  }).join(''):'<div class="empty"><i class="ti ti-users"></i><p>Belum ada karyawan</p></div>';
+  const banner=document.getElementById('sync-banner');
+  if(banner) banner.style.display='none';
 }
 
 // ── ADMIN KARYAWAN ────────────────────────────────────
@@ -1465,7 +1493,7 @@ function saveEmp(){
 
     try {
       // Ambil users terbaru dari Firebase SDK
-      let users = await FB.get('owl/users') || getUsers();
+      let users = await FB.get('users') || getUsers();
 
       if(editEmpUid){
         if(un !== editEmpUid && users[un]){toast('❗ Username sudah dipakai!','er');return;}
@@ -1473,10 +1501,10 @@ function saveEmp(){
         const updated = {...old, nama, jab, div, warna};
         if(pw.length>=4) updated.pw = pw;
         // Simpan via Firebase SDK
-        const ok = await FB.set('owl/users/'+un, updated);
+        const ok = await FB.set('users/'+un, updated);
         if(!ok) throw new Error('Gagal simpan ke Firebase');
         if(un !== editEmpUid){
-          await FB.del('owl/users/'+editEmpUid);
+          await FB.del('users/'+editEmpUid);
           delete users[editEmpUid];
         }
         users[un] = updated;
@@ -1487,7 +1515,7 @@ function saveEmp(){
         const newId = 'KRY-'+String(Object.keys(users).filter(k=>users[k]&&users[k].role!=='admin').length+1).padStart(3,'0');
         const newUser = {pw, nama, jab, div, id:newId, role:'karyawan', warna};
         // Simpan langsung ke path Firebase SDK
-        const ok = await FB.set('owl/users/'+un, newUser);
+        const ok = await FB.set('users/'+un, newUser);
         if(!ok) throw new Error('Gagal simpan ke Firebase');
         users[un] = newUser;
         toast('✅ Karyawan '+nama+' berhasil ditambahkan!','ok');
@@ -1510,8 +1538,8 @@ function saveEmp(){
 function hapusEmp(uid,nama){
   guardAdmin(async ()=>{
     if(!confirm('Hapus karyawan "'+nama+'"?\nSemua data absensinya juga akan dihapus permanen!'))return;
-    await FB.del('owl/users/'+uid);
-    await FB.del('owl/absensi/'+uid);
+    await FB.del('users/'+uid);
+    await FB.del('absensi/'+uid);
     const users=getUsers(); delete users[uid]; DB.setLocal('users',users);
     const ab=getAllAbsensi(); delete ab[uid]; DB.setLocal('absensi',ab);
     renderEmpList(); renderAdminDash(); populateLapFilter();
@@ -1520,16 +1548,18 @@ function hapusEmp(uid,nama){
 }
 
 // ── ADMIN LAPORAN ─────────────────────────────────────
-function populateLapFilter(){
+async function populateLapFilter(){
   const sel=document.getElementById('sel-bln');if(!sel)return;
   const now=new Date();sel.innerHTML='';
   for(let i=0;i<12;i++){
     const d=new Date(now.getFullYear(),now.getMonth()-i,1);
-    const val=d.getFullYear()+'-'+(d.getMonth()+1);
-    sel.innerHTML+=`<option value="${val}">${BL[d.getMonth()]} ${d.getFullYear()}</option>`;
+    sel.innerHTML+=`<option value="${d.getFullYear()+'-'+(d.getMonth()+1)}">${BL[d.getMonth()]} ${d.getFullYear()}</option>`;
   }
+  // Ambil users terbaru dari Firebase
+  const fbUsers=await FB.get('users');
+  const users=fbUsers||getUsers();
+  if(fbUsers) DB.setLocal('users',fbUsers);
   const selE=document.getElementById('sel-emp');if(!selE)return;
-  const users=getUsers();
   selE.innerHTML='<option value="all">Semua Karyawan</option>';
   Object.entries(users).filter(([,u])=>u.role!=='admin').forEach(([uid,u])=>{
     selE.innerHTML+=`<option value="${uid}">${u.nama}</option>`;
@@ -1537,31 +1567,38 @@ function populateLapFilter(){
   renderLap();
 }
 
-function renderLap(){
+async function renderLap(){
   const selB=document.getElementById('sel-bln');if(!selB||!selB.value)return;
   const[thn,bln]=selB.value.split('-').map(Number);
   const empF=(document.getElementById('sel-emp')||{value:'all'}).value;
-  const users=getUsers(),absensi=getAllAbsensi(),cfg=getCfg();
+  // Selalu ambil data terbaru dari Firebase
+  const [fbUsers,fbAbsensi,fbCfg]= await Promise.all([FB.get('users'),FB.get('absensi'),FB.get('config')]);
+  const users  = fbUsers   || getUsers();
+  const absensi= fbAbsensi || getAllAbsensi();
+  const cfg    = fbCfg     || getCfg();
+  if(fbUsers)   DB.setLocal('users',   fbUsers);
+  if(fbAbsensi) DB.setLocal('absensi', fbAbsensi);
+  if(fbCfg)     DB.setLocal('config',  fbCfg);
+
   let rows=Object.entries(users).filter(([,u])=>u.role!=='admin');
   if(empF!=='all')rows=rows.filter(([uid])=>uid===empF);
   const fmt=v=>'Rp '+v.toLocaleString('id-ID');
   let gtotal=0,gjam=0;
   document.getElementById('lap-body').innerHTML=rows.map(([uid,u])=>{
     const list=(absensi[uid]||[]).filter(r=>{const d=new Date(r.ms);return d.getFullYear()===thn&&d.getMonth()+1===bln&&r.tipe==='masuk';});
-    // durasiMs sudah efektif (dipotong istirahat)
     const jam =Math.round(list.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000*10)/10;
-    const hari=list.length, gaji=Math.round(jam*cfg.tarifJam);
-    gtotal+=gaji; gjam+=jam;
+    const hari=list.length,gaji=Math.round(jam*cfg.tarifJam);
+    gtotal+=gaji;gjam+=jam;
     return `<tr>
       <td style="font-weight:700;font-size:11px">${u.nama.split(' ')[0]}</td>
       <td>${hari}</td>
-      <td title="Jam efektif (sudah dipotong istirahat)">${jam}</td>
+      <td>${jam}</td>
       <td style="color:#0369a1;font-weight:700">${fmt(gaji)}</td>
       <td><span class="bdg bdg-g">Aktif</span></td>
     </tr>`;
   }).join('');
   document.getElementById('lap-total-n').textContent=fmt(gtotal);
-  const iLabel=cfg.istirahatMulai?' (efektif, sudah dipotong istirahat '+cfg.istirahatMulai+'–'+cfg.istirahatSelesai+')':'';
+  const iLabel=cfg.istirahatMulai?' (dipotong istirahat '+cfg.istirahatMulai+'–'+cfg.istirahatSelesai+')':'';
   document.getElementById('lap-total-d').textContent=rows.length+' karyawan · '+Math.round(gjam*10)/10+' jam'+iLabel;
 }
 
@@ -1661,7 +1698,7 @@ function saveSetting(){
       tarifJam:parseInt(val('cfg-tarif','12500'))||12500
     };
     DB.setLocal('config',cfg);
-    await FB.set('owl/config', cfg);
+    await FB.set('config', cfg);
     const tEl=document.getElementById('g-tarif'); if(tEl) tEl.textContent='Rp '+cfg.tarifJam.toLocaleString('id-ID');
     const iEl=document.getElementById('info-tarif'); if(iEl) iEl.textContent=cfg.tarifJam.toLocaleString('id-ID');
     if(lat&&lon) updatePreviewKoordinat(cfg.latKantor,cfg.lonKantor,1);
@@ -1806,7 +1843,7 @@ function gantiPw(){
     if(nw!==cf){toast('❗ Konfirmasi tidak cocok!','er');return;}
     users['admin'].pw=nw;
     DB.setLocal('users',users);
-    await FB.set('owl/users/admin/pw', nw);
+    await FB.set('users/admin/pw', nw);
     ['pw-old','pw-new','pw-confirm'].forEach(id=>document.getElementById(id).value='');
     toast('🔐 Password berhasil diganti!','ok');
   });
