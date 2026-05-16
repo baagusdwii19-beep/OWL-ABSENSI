@@ -1682,8 +1682,12 @@ function exportCSV(){
 function exportPDF(){guardAdmin(()=>{toast('🖨️ Membuka dialog cetak...','ok');setTimeout(()=>window.print(),600);});}
 
 // ── SETTING ───────────────────────────────────────────
-function loadSetting(){
-  const cfg=getCfg();
+async function loadSetting(){
+  // Ambil config terbaru dari Firebase
+  const fbCfg = await FB.get('config');
+  if(fbCfg) DB.setLocal('config', fbCfg);
+  const cfg = fbCfg || getCfg();
+
   document.getElementById('cfg-perusahaan').value        = cfg.perusahaan||'';
   document.getElementById('cfg-alamat').value            = cfg.alamat||'';
   document.getElementById('cfg-nama1').value             = cfg.namaLokasi1||'Kantor Pusat';
