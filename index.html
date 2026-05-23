@@ -1458,11 +1458,72 @@ function renderEmpList(){
     <div class="emp-item">
       <div class="emp-av" style="background:${u.warna||'#0ea5e9'}">${u.nama.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
       <div class="emp-tx"><div class="en">${u.nama}</div><div class="ed">${u.jab} · ${u.div||'-'} · ${u.id}</div></div>
-      <div style="display:flex;gap:6px">
-        <button class="ic-btn edit" onclick="editEmp('${uid}')"><i class="ti ti-edit"></i></button>
-        <button class="ic-btn del" onclick="hapusEmp('${uid}','${u.nama.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+        <button class="ic-btn" style="background:#dcfce7;color:#15803d" onclick="lihatRiwayatKaryawan('${uid}','${u.nama.replace(/'/g,"\\'")}')"  title="Lihat Riwayat"><i class="ti ti-history"></i></button>
+        <button class="ic-btn edit" onclick="editEmp('${uid}')" title="Edit"><i class="ti ti-edit"></i></button>
+        <button class="ic-btn del" onclick="hapusEmp('${uid}','${u.nama.replace(/'/g,"\\'")}')" title="Hapus"><i class="ti ti-trash"></i></button>
       </div>
     </div>`).join('');
+}
+
+// Lihat riwayat absensi semua karyawan
+async function lihatRiwayatKaryawan(uid, nama){
+  guardAdmin(async ()=>{
+    toast('⏳ Memuat riwayat...','');
+    const list = await FB.get('absensi/'+uid) || [];
+
+    // Buat modal jika belum ada
+    let md = document.getElementById('mdRiwayatKry');
+    if(!md){
+      md = document.createElement('div');
+      md.id = 'mdRiwayatKry';
+      md.className = 'modal-bg';
+      md.innerHTML = `
+        <div class="modal" style="max-width:540px;max-height:85vh;overflow-y:auto">
+          <h3 id="riw-kry-title">Riwayat Absensi</h3>
+          <div id="riw-kry-summary" style="background:var(--bl);padding:10px 12px;border-radius:10px;margin-bottom:12px;font-size:11px;color:var(--bd);font-weight:600"></div>
+          <div id="riw-kry-list"></div>
+          <div class="modal-acts"><button class="mk" style="width:100%" onclick="closeMd('mdRiwayatKry')">Tutup</button></div>
+        </div>`;
+      document.body.appendChild(md);
+    }
+
+    document.getElementById('riw-kry-title').textContent = '📋 Riwayat: '+nama;
+
+    if(!list.length){
+      document.getElementById('riw-kry-summary').textContent = 'Belum ada absensi';
+      document.getElementById('riw-kry-list').innerHTML = '<div class="empty"><i class="ti ti-clock-off"></i><p>Karyawan belum pernah absen</p></div>';
+    } else {
+      // Hitung statistik
+      const masukList = list.filter(r=>r.tipe==='masuk');
+      const terlambat = masukList.filter(r=>r.terlambat).length;
+      const totalJam = Math.round(masukList.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000*10)/10;
+      document.getElementById('riw-kry-summary').innerHTML = 
+        `📅 ${masukList.length} hari kerja · ⏰ ${totalJam} jam · ⚠️ ${terlambat} terlambat`;
+
+      // Urutkan terbaru di atas
+      const sorted = [...list].sort((a,b)=>(b.ms||0)-(a.ms||0));
+      document.getElementById('riw-kry-list').innerHTML = sorted.map(r=>{
+        const isMasuk = r.tipe==='masuk';
+        const bgIc = isMasuk?(r.terlambat?'#fef3c7':'#dcfce7'):'#fee2e2';
+        const cIc  = isMasuk?(r.terlambat?'#b45309':'#15803d'):'#dc2626';
+        const ic   = isMasuk?'login':'logout';
+        const dur  = r.durasi?'<div style="font-size:10px;color:var(--mt);margin-top:3px">⏱️ '+r.durasi+'</div>':'';
+        const tag  = r.terlambat?'<span class="bdg bdg-a" style="font-size:9px">Terlambat</span>':'';
+        return `<div class="emp-item" style="border:1px solid var(--br);border-radius:11px;padding:10px;margin-bottom:8px">
+          <div class="emp-av" style="background:${bgIc};color:${cIc}"><i class="ti ti-${ic}" style="font-size:18px"></i></div>
+          <div class="emp-tx" style="flex:1">
+            <div class="en" style="font-size:12px">Absen ${isMasuk?'Masuk':'Keluar'} ${tag}</div>
+            <div class="ed" style="font-size:10px">📅 ${r.tgl} · 🕐 ${r.jam}</div>
+            <div class="ed" style="font-size:10px">📍 ${r.lokasi||'-'}</div>
+            ${dur}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    openMd('mdRiwayatKry');
+  });
 }
 
 let editEmpUid=null;
