@@ -304,11 +304,16 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
 
   <!-- RIWAYAT -->
   <div class="pg" id="pg-riwayat">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
       <div class="sec" style="margin-bottom:0"><i class="ti ti-history"></i> Riwayat Absensi</div>
-      <select id="rw-filter" onchange="renderRiwayat()" style="padding:6px 10px;border:1px solid var(--br);border-radius:9px;font-size:11px;color:var(--tx);background:#fff;outline:none">
-        <option value="7">7 Hari</option><option value="30">30 Hari</option><option value="all">Semua</option>
-      </select>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <select id="rw-emp-filter" onchange="renderRiwayat()" style="padding:6px 10px;border:1px solid var(--br);border-radius:9px;font-size:11px;color:var(--tx);background:#fff;outline:none;display:none">
+          <option value="all">Semua Karyawan</option>
+        </select>
+        <select id="rw-filter" onchange="renderRiwayat()" style="padding:6px 10px;border:1px solid var(--br);border-radius:9px;font-size:11px;color:var(--tx);background:#fff;outline:none">
+          <option value="7">7 Hari</option><option value="30">30 Hari</option><option value="all">Semua</option>
+        </select>
+      </div>
     </div>
     <div id="rw-list"></div>
   </div>
@@ -1269,18 +1274,79 @@ function konfirmasi(){
 }
 
 // ── RIWAYAT ───────────────────────────────────────────
-function renderRiwayat(){
-  const filter=document.getElementById('rw-filter').value;
-  let list=getUserAbs(curUser.username);
-  if(filter!=='all'){const cut=Date.now()-parseInt(filter)*86400000;list=list.filter(r=>r.ms>=cut);}
-  const el=document.getElementById('rw-list');
-  if(!list.length){el.innerHTML='<div class="empty"><i class="ti ti-history"></i><p>Belum ada riwayat absensi</p></div>';return;}
-  el.innerHTML=list.map(r=>{
-    const mapsUrl=r.lokasi?`https://www.google.com/maps?q=${r.lokasi.lat},${r.lokasi.lon}&z=17`:'#';
-    const lokasiTeks=r.lokasi?(r.lokasi.kota||r.lokasi.lat+', '+r.lokasi.lon):'Unknown';
+async function renderRiwayat(){
+  const filter   = document.getElementById('rw-filter').value;
+  const empFilter= (document.getElementById('rw-emp-filter')||{value:'all'}).value;
+  const el       = document.getElementById('rw-list');
+
+  // Tampilkan filter karyawan hanya untuk admin
+  const empFilterEl = document.getElementById('rw-emp-filter');
+  if(isAdmin()){
+    empFilterEl.style.display = '';
+    // Populate dropdown karyawan jika belum
+    if(empFilterEl.options.length<=1){
+      const users = await FB.get('users') || getUsers();
+      empFilterEl.innerHTML = '<option value="all">📋 Semua Karyawan</option>';
+      Object.entries(users).filter(([,u])=>u.role!=='admin').forEach(([uid,u])=>{
+        empFilterEl.innerHTML += `<option value="${uid}">${u.nama}</option>`;
+      });
+    }
+  } else {
+    empFilterEl.style.display = 'none';
+  }
+
+  // Ambil data dari Firebase
+  el.innerHTML = '<div class="empty"><i class="ti ti-loader"></i><p>Memuat data...</p></div>';
+
+  let allRecords = []; // {uid, nama, ...absensi}
+
+  if(isAdmin()){
+    // Admin: ambil absensi semua karyawan
+    const [fbAbsensi, fbUsers] = await Promise.all([FB.get('absensi'), FB.get('users')]);
+    const absensi = fbAbsensi || {};
+    const users   = fbUsers || getUsers();
+    if(fbAbsensi) DB.setLocal('absensi', fbAbsensi);
+
+    Object.entries(absensi).forEach(([uid, list])=>{
+      if(empFilter!=='all' && empFilter!==uid) return;
+      const u = users[uid];
+      if(!u || u.role==='admin') return;
+      (list||[]).forEach(r=>{
+        allRecords.push({...r, _uid:uid, _nama:u.nama, _warna:u.warna||'#0ea5e9'});
+      });
+    });
+  } else {
+    // Karyawan: hanya absensi sendiri
+    const fbAbs = await FB.get('absensi/'+curUser.username);
+    if(fbAbs){
+      DB.setLocal('absensi', {...getAllAbsensi(), [curUser.username]: fbAbs});
+    }
+    const list = fbAbs || getUserAbs(curUser.username);
+    list.forEach(r=> allRecords.push({...r, _uid:curUser.username, _nama:curUser.nama, _warna:curUser.warna}));
+  }
+
+  // Filter berdasarkan tanggal
+  if(filter!=='all'){
+    const cut = Date.now() - parseInt(filter)*86400000;
+    allRecords = allRecords.filter(r=>r.ms>=cut);
+  }
+
+  // Urutkan terbaru di atas
+  allRecords.sort((a,b)=>(b.ms||0)-(a.ms||0));
+
+  if(!allRecords.length){
+    el.innerHTML = '<div class="empty"><i class="ti ti-history"></i><p>Belum ada riwayat absensi</p></div>';
+    return;
+  }
+
+  el.innerHTML = allRecords.map(r=>{
+    const mapsUrl    = r.lokasi ? `https://www.google.com/maps?q=${r.lokasi.lat},${r.lokasi.lon}&z=17` : '#';
+    const lokasiTeks = r.lokasi ? (r.lokasi.kota||r.lokasi.lat+', '+r.lokasi.lon) : 'Unknown';
+    const nameTag    = isAdmin() ? `<div style="font-size:10px;color:${r._warna};font-weight:700;margin-bottom:2px">👤 ${r._nama}</div>` : '';
     return `<div class="ri">
       <div class="ri-ic ${r.tipe==='masuk'?'m':'k'}"><i class="ti ti-${r.tipe==='masuk'?'login':'logout'}"></i></div>
       <div class="ri-tx">
+        ${nameTag}
         <div class="rn">${r.tipe==='masuk'?'Absen Masuk':'Absen Keluar'}${r.terlambat?' <span class="bdg bdg-a">Terlambat</span>':''}${r.durasi?' <span class="bdg bdg-b">'+r.durasi+'</span>':''}</div>
         <div class="rd">${r.tgl} · <a href="${mapsUrl}" target="_blank" style="color:#0ea5e9;text-decoration:none">📍 ${lokasiTeks}</a></div>
       </div>
