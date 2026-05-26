@@ -1688,9 +1688,19 @@ async function editJamAbsensi(uid, idx){
       const j = Math.floor(efektif/3600000);
       const m = Math.floor((efektif%3600000)/60000);
       const durStr = j+'j '+m+'m';
-      keluar.durasi = durStr;
-      keluar.durasiMs = efektif;
+      // PENTING: durasi disimpan di record MASUK (calcGaji baca dari masuk)
+      masuk.durasi     = durStr;
+      masuk.durasiMs   = efektif;
+      masuk.durasiTotal= totalMs;
+      // Juga simpan di keluar untuk tampilan riwayat
+      keluar.durasi    = durStr;
+      keluar.durasiMs  = efektif;
       keluar.durasiTotal = totalMs;
+    } else if(masuk && !keluar){
+      // Hanya ada masuk, reset durasi
+      masuk.durasi = '';
+      masuk.durasiMs = 0;
+      masuk.durasiTotal = 0;
     }
 
     // Simpan ke Firebase
@@ -1797,9 +1807,15 @@ async function tambahAbsensiManual(uid, nama){
       const efektif = hitungDurasiEfektif(masuk.ms, keluar.ms, cfg);
       const totalMs = keluar.ms - masuk.ms;
       const j = Math.floor(efektif/3600000);
-      const m = Math.floor((efektif%3600000)/60000);
-      keluar.durasi = j+'j '+m+'m';
-      keluar.durasiMs = efektif;
+      const mm = Math.floor((efektif%3600000)/60000);
+      const durStr = j+'j '+mm+'m';
+      // PENTING: durasi disimpan di record MASUK (calcGaji baca dari masuk)
+      masuk.durasi     = durStr;
+      masuk.durasiMs   = efektif;
+      masuk.durasiTotal= totalMs;
+      // Juga simpan di keluar untuk tampilan riwayat
+      keluar.durasi    = durStr;
+      keluar.durasiMs  = efektif;
       keluar.durasiTotal = totalMs;
     }
 
