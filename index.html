@@ -340,9 +340,14 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
       <div id="g-minggu"></div>
     </div>
     <div class="gcard">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">
         <div class="sec" style="margin-bottom:0"><i class="ti ti-calendar-event"></i> Rincian Per Tanggal</div>
-        <select id="g-bulan-filter" onchange="calcGaji()" style="padding:6px 10px;border:1px solid var(--br);border-radius:9px;font-size:11px;color:var(--tx);background:#fff;outline:none"></select>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <select id="g-emp-filter" onchange="calcGaji()" style="padding:6px 10px;border:1px solid var(--br);border-radius:9px;font-size:11px;color:var(--tx);background:#fff;outline:none;display:none">
+            <option value="">👤 Karyawan</option>
+          </select>
+          <select id="g-bulan-filter" onchange="calcGaji()" style="padding:6px 10px;border:1px solid var(--br);border-radius:9px;font-size:11px;color:var(--tx);background:#fff;outline:none"></select>
+        </div>
       </div>
       <div id="g-tanggal-list" style="max-height:400px;overflow-y:auto"></div>
     </div>
@@ -1399,15 +1404,42 @@ async function renderRiwayat(){
 
 // ── GAJI ──────────────────────────────────────────────
 async function calcGaji(){
-  // Ambil data absensi terbaru dari Firebase
-  const fbAbs = await FB.get('absensi/'+curUser.username);
-  if(fbAbs){ DB.setLocal('absensi', {...getAllAbsensi(), [curUser.username]: fbAbs}); }
+  const fmt  = v=>'Rp '+v.toLocaleString('id-ID');
+
+  // Populate dropdown karyawan untuk admin
+  const selEmp = document.getElementById('g-emp-filter');
+  if(selEmp && isAdmin()){
+    selEmp.style.display = '';
+    if(selEmp.options.length<=1){
+      const users = await FB.get('users') || getUsers();
+      let html = '<option value="">👤 Saya (Admin)</option>';
+      Object.entries(users).filter(([,u])=>u.role!=='admin').forEach(([uid,u])=>{
+        html += `<option value="${uid}">${u.nama}</option>`;
+      });
+      selEmp.innerHTML = html;
+    }
+  } else if(selEmp){
+    selEmp.style.display = 'none';
+  }
+
+  // Tentukan target user (default: user yang login, admin bisa pilih karyawan)
+  const targetUid = (isAdmin() && selEmp && selEmp.value) ? selEmp.value : curUser.username;
+
+  // Ambil data absensi target user dari Firebase
+  const fbAbs = await FB.get('absensi/'+targetUid);
+  if(fbAbs){ DB.setLocal('absensi', {...getAllAbsensi(), [targetUid]: fbAbs}); }
   const fbCfg = await FB.get('config');
   const cfg   = fbCfg || getCfg();
   if(fbCfg) DB.setLocal('config', fbCfg);
 
-  const list = fbAbs || getUserAbs(curUser.username);
-  const fmt  = v=>'Rp '+v.toLocaleString('id-ID');
+  // Ambil nama target user untuk header
+  let targetNama = curUser.nama;
+  if(targetUid !== curUser.username){
+    const allUsers = await FB.get('users') || getUsers();
+    targetNama = allUsers[targetUid]?.nama || targetUid;
+  }
+
+  const list = fbAbs || getUserAbs(targetUid);
 
   // Populate dropdown bulan (12 bulan terakhir)
   const selBln = document.getElementById('g-bulan-filter');
@@ -1446,6 +1478,11 @@ async function calcGaji(){
   const totPotong= bList.reduce((s,r)=>s+((r.durasiTotal||0)-(r.durasiMs||0)),0);
   const potongMnt= Math.round(totPotong/60000);
 
+  // Update card ringkasan gaji — kalau admin lihat karyawan lain, beri label nama
+  const sumLabel = (targetUid !== curUser.username) ? '💰 Estimasi Gaji '+targetNama : '💰 Estimasi Gaji Bulan Ini';
+  const sumLabelEl = document.querySelector('#pg-gaji .gsum .gl');
+  if(sumLabelEl) sumLabelEl.textContent = sumLabel;
+
   document.getElementById('g-total').textContent  = fmt(total);
   document.getElementById('g-det').textContent    = totJam+' jam efektif × '+fmt(cfg.tarifJam)+'/jam';
   document.getElementById('g-hari').textContent   = totHari+' hari';
@@ -1469,11 +1506,10 @@ async function calcGaji(){
   const tglListEl = document.getElementById('g-tanggal-list');
   if(tglListEl){
     if(bList.length===0){
-      tglListEl.innerHTML = '<div class="empty" style="padding:20px"><i class="ti ti-calendar-off"></i><p style="font-size:11px;color:var(--mt)">Belum ada absensi di bulan ini</p></div>';
+      const namaInfo = (targetUid !== curUser.username) ? ' ('+targetNama+')' : '';
+      tglListEl.innerHTML = '<div class="empty" style="padding:20px"><i class="ti ti-calendar-off"></i><p style="font-size:11px;color:var(--mt)">Belum ada absensi di bulan ini'+namaInfo+'</p></div>';
     } else {
-      // Urutkan dari tanggal terbaru
       const sortedB = [...bList].sort((a,b)=>(b.ms||0)-(a.ms||0));
-      // Cari pasangan keluar untuk tiap masuk
       const HARI = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
       tglListEl.innerHTML = sortedB.map(r=>{
         const d        = new Date(r.ms);
@@ -1483,7 +1519,6 @@ async function calcGaji(){
         const jamMs    = r.durasiMs||0;
         const jamKerja = Math.round(jamMs/3600000*10)/10;
         const gajiHari = Math.round(jamKerja*cfg.tarifJam);
-        // Cari pasangan keluar
         const keluar   = list.find(x=>x.tgl===r.tgl && x.tipe==='keluar');
         const jamMasukStr  = r.jam || '--:--';
         const jamKeluarStr = keluar ? keluar.jam : '--:--';
