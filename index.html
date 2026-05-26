@@ -406,7 +406,7 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
       </div>
       <div class="gaji-tot"><div class="gtl">Total Penggajian</div><div class="gtn" id="lap-total-n">Rp 0</div><div class="gtd" id="lap-total-d">0 karyawan</div></div>
       <div class="exp-row">
-        <button class="exp-btn exp-csv" onclick="exportCSV()"><i class="ti ti-file-spreadsheet"></i> Export CSV</button>
+        <button class="exp-btn exp-csv" onclick="exportCSV()"><i class="ti ti-file-spreadsheet"></i> Export Excel</button>
         <button class="exp-btn exp-pdf" onclick="exportPDF()"><i class="ti ti-printer"></i> Cetak PDF</button>
       </div>
     </div>
@@ -2144,33 +2144,109 @@ async function renderLap(){
   document.getElementById('lap-total-d').textContent=rows.length+' karyawan · '+Math.round(gjam*10)/10+' jam'+iLabel;
 }
 
-function exportCSV(){
-  guardAdmin(()=>{
+async function exportCSV(){
+  guardAdmin(async ()=>{
+    toast('⏳ Menyiapkan laporan...','');
     const selB=document.getElementById('sel-bln');
     const[thn,bln]=selB.value.split('-').map(Number);
     const blnNm=BL[bln-1]+' '+thn;
     const empF=(document.getElementById('sel-emp')||{value:'all'}).value;
-    const users=getUsers(),absensi=getAllAbsensi(),cfg=getCfg();
+
+    // Ambil data terbaru dari Firebase
+    const [fbUsers,fbAbsensi,fbCfg]= await Promise.all([FB.get('users'),FB.get('absensi'),FB.get('config')]);
+    const users  = fbUsers   || getUsers();
+    const absensi= fbAbsensi || getAllAbsensi();
+    const cfg    = fbCfg     || getCfg();
+
     let rows=Object.entries(users).filter(([,u])=>u.role!=='admin');
     if(empF!=='all')rows=rows.filter(([uid])=>uid===empF);
-    const fmt=v=>'Rp '+v.toLocaleString('id-ID');
-    const lines=[
-      [cfg.perusahaan+' - Laporan Absensi '+blnNm],[''],
-      ['Nama','Divisi','Hari Kerja','Total Jam (jam)','Total Gaji (Rp)','Tarif/Jam (Rp)'],
-      ...rows.map(([uid,u])=>{
-        const list=(absensi[uid]||[]).filter(r=>{const d=new Date(r.ms);return d.getFullYear()===thn&&d.getMonth()+1===bln&&r.tipe==='masuk';});
-        const jam=Math.round(list.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000*10)/10;
-        return[u.nama,u.div||'-',list.length,jam,Math.round(jam*cfg.tarifJam),cfg.tarifJam];
-      }),[''],
-      ['TOTAL','',rows.reduce((s,[uid])=>(absensi[uid]||[]).filter(r=>{const d=new Date(r.ms);return d.getFullYear()===thn&&d.getMonth()+1===bln&&r.tipe==='masuk';}).length+s,0),
-       Math.round(rows.reduce((s,[uid])=>(absensi[uid]||[]).filter(r=>{const d=new Date(r.ms);return d.getFullYear()===thn&&d.getMonth()+1===bln&&r.tipe==='masuk';}).reduce((ss,r)=>ss+(r.durasiMs||0),0)+s,0)/3600000*10)/10,
-       rows.reduce((s,[uid])=>{const list=(absensi[uid]||[]).filter(r=>{const d=new Date(r.ms);return d.getFullYear()===thn&&d.getMonth()+1===bln&&r.tipe==='masuk';});return s+Math.round(list.reduce((ss,r)=>ss+(r.durasiMs||0),0)/3600000*cfg.tarifJam);},0),'']
-    ];
-    const csv=lines.map(r=>r.join(',')).join('\n');
-    const a=document.createElement('a');
-    a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
-    a.download='owl_laporan_'+blnNm.replace(' ','_')+'.csv';a.click();
-    toast('📊 CSV berhasil didownload!','ok');
+    const fmt = v=>v.toLocaleString('id-ID');
+
+    // Hitung total
+    let totHari=0, totJam=0, totGaji=0;
+    const dataRows = rows.map(([uid,u])=>{
+      const list=(absensi[uid]||[]).filter(r=>{const d=new Date(r.ms);return d.getFullYear()===thn&&d.getMonth()+1===bln&&r.tipe==='masuk';});
+      const jam = Math.round(list.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000*10)/10;
+      const gaji= Math.round(jam*cfg.tarifJam);
+      totHari += list.length; totJam += jam; totGaji += gaji;
+      return {nama:u.nama, jab:u.jab||'-', div:u.div||'-', id:u.id||'-', hari:list.length, jam, gaji};
+    });
+    totJam = Math.round(totJam*10)/10;
+
+    // Buat tabel HTML yang akan dibaca Excel sebagai spreadsheet
+    const tglCetak = new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="UTF-8">
+<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
+<x:Name>Laporan ${blnNm}</x:Name>
+<x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+<style>
+  table{border-collapse:collapse;font-family:Calibri,Arial;font-size:11pt}
+  th,td{border:1px solid #94a3b8;padding:8px 12px}
+  .title{font-size:18pt;font-weight:bold;color:#0c4a6e;background:#bae6fd;text-align:center;padding:12px}
+  .sub{font-size:11pt;color:#475569;background:#e0f2fe;text-align:center;padding:6px}
+  .hdr{background:#0ea5e9;color:#fff;font-weight:bold;text-align:center;font-size:11pt}
+  .num{text-align:right;mso-number-format:"\#\,\#\#0"}
+  .rp{text-align:right;mso-number-format:"\\"Rp\\ \\"\#\,\#\#0";color:#0c4a6e;font-weight:bold}
+  .cn{text-align:center}
+  .total{background:#fef3c7;font-weight:bold;color:#92400e;font-size:12pt}
+  .total .rp{color:#15803d;font-size:13pt}
+  .alt{background:#f1f5f9}
+</style>
+</head><body>
+<table>
+  <tr><td colspan="7" class="title">${cfg.perusahaan||'OWL Absensi'} — Laporan Absensi</td></tr>
+  <tr><td colspan="7" class="sub">Periode: <b>${blnNm}</b> · Tarif: Rp ${fmt(cfg.tarifJam)}/jam · Dicetak: ${tglCetak}</td></tr>
+  <tr><td colspan="7" style="height:8px;border:none"></td></tr>
+  <tr class="hdr">
+    <th style="width:40px">No</th>
+    <th style="width:60px">ID</th>
+    <th style="width:180px">Nama Karyawan</th>
+    <th style="width:120px">Jabatan</th>
+    <th style="width:80px">Hari Kerja</th>
+    <th style="width:100px">Total Jam</th>
+    <th style="width:140px">Total Gaji</th>
+  </tr>
+  ${dataRows.map((r,i)=>`
+  <tr${i%2===1?' class="alt"':''}>
+    <td class="cn">${i+1}</td>
+    <td class="cn">${r.id}</td>
+    <td>${r.nama}</td>
+    <td>${r.jab}${r.div&&r.div!=='-'?' · '+r.div:''}</td>
+    <td class="cn">${r.hari} hari</td>
+    <td class="num">${r.jam} jam</td>
+    <td class="rp">Rp ${fmt(r.gaji)}</td>
+  </tr>`).join('')}
+  <tr class="total">
+    <td colspan="4" style="text-align:right;padding-right:14px">TOTAL ${rows.length} KARYAWAN</td>
+    <td class="cn">${totHari}</td>
+    <td class="num">${totJam} jam</td>
+    <td class="rp">Rp ${fmt(totGaji)}</td>
+  </tr>
+</table>
+<br>
+<table>
+  <tr><td colspan="2" class="hdr" style="background:#475569">📊 Ringkasan</td></tr>
+  <tr><td>Total Karyawan</td><td class="cn"><b>${rows.length}</b></td></tr>
+  <tr><td>Total Hari Kerja</td><td class="cn"><b>${totHari} hari</b></td></tr>
+  <tr><td>Total Jam Kerja</td><td class="cn"><b>${totJam} jam</b></td></tr>
+  <tr><td>Tarif Per Jam</td><td class="rp">Rp ${fmt(cfg.tarifJam)}</td></tr>
+  <tr class="total"><td>Total Gaji Dibayarkan</td><td class="rp">Rp ${fmt(totGaji)}</td></tr>
+</table>
+</body></html>`;
+
+    // Trigger download sebagai file .xls (Excel akan buka sebagai spreadsheet)
+    const blob = new Blob(['\uFEFF'+html], {type:'application/vnd.ms-excel'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Laporan_Absensi_'+blnNm.replace(' ','_')+'.xls';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{URL.revokeObjectURL(url); a.remove();}, 100);
+    toast('📊 Laporan Excel berhasil didownload!','ok');
   });
 }
 
