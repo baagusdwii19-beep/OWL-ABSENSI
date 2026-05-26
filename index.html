@@ -342,11 +342,27 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
     <div class="gcard">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">
         <div class="sec" style="margin-bottom:0"><i class="ti ti-calendar-event"></i> Rincian Per Tanggal</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <select id="g-emp-filter" onchange="calcGaji()" style="padding:6px 10px;border:1px solid var(--br);border-radius:9px;font-size:11px;color:var(--tx);background:#fff;outline:none;display:none">
-            <option value="">👤 Karyawan</option>
-          </select>
-          <select id="g-bulan-filter" onchange="calcGaji()" style="padding:6px 10px;border:1px solid var(--br);border-radius:9px;font-size:11px;color:var(--tx);background:#fff;outline:none"></select>
+        <select id="g-emp-filter" onchange="calcGaji()" style="padding:6px 10px;border:1px solid var(--br);border-radius:9px;font-size:11px;color:var(--tx);background:#fff;outline:none;display:none">
+          <option value="">👤 Karyawan</option>
+        </select>
+      </div>
+      <div style="background:var(--bp);border-radius:10px;padding:10px;margin-bottom:10px">
+        <div style="font-size:10px;font-weight:700;color:var(--mt);margin-bottom:6px;text-transform:uppercase">📆 Filter Rentang Tanggal</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <div style="flex:1;min-width:130px">
+            <label style="font-size:10px;color:var(--mt);display:block;margin-bottom:2px">Dari</label>
+            <input type="date" id="g-tgl-mulai" onchange="calcGaji()" style="width:100%;padding:7px 10px;border:1px solid var(--br);border-radius:8px;font-size:11px;color:var(--tx);background:#fff;outline:none">
+          </div>
+          <div style="flex:1;min-width:130px">
+            <label style="font-size:10px;color:var(--mt);display:block;margin-bottom:2px">Sampai</label>
+            <input type="date" id="g-tgl-akhir" onchange="calcGaji()" style="width:100%;padding:7px 10px;border:1px solid var(--br);border-radius:8px;font-size:11px;color:var(--tx);background:#fff;outline:none">
+          </div>
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">
+          <button onclick="setGajiPeriode('thismonth')" style="background:#fff;color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:5px 10px;font-size:10px;font-weight:600;cursor:pointer">📅 Bulan Ini</button>
+          <button onclick="setGajiPeriode('lastmonth')" style="background:#fff;color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:5px 10px;font-size:10px;font-weight:600;cursor:pointer">← Bulan Lalu</button>
+          <button onclick="setGajiPeriode('week')" style="background:#fff;color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:5px 10px;font-size:10px;font-weight:600;cursor:pointer">7 Hari</button>
+          <button onclick="setGajiPeriode('30days')" style="background:#fff;color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:5px 10px;font-size:10px;font-weight:600;cursor:pointer">30 Hari</button>
         </div>
       </div>
       <div id="g-tanggal-list" style="max-height:400px;overflow-y:auto"></div>
@@ -394,10 +410,28 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
       <div id="emp-list"></div>
     </div>
     <div id="ad-laporan" style="display:none">
-      <div style="display:flex;gap:7px;margin-bottom:12px">
-        <select id="sel-bln" style="flex:1;padding:9px;border:1.5px solid var(--br);border-radius:10px;font-size:12px;color:var(--tx);background:#fff;outline:none" onchange="renderLap()"></select>
-        <select id="sel-emp" style="flex:1;padding:9px;border:1.5px solid var(--br);border-radius:10px;font-size:12px;color:var(--tx);background:#fff;outline:none" onchange="renderLap()"><option value="all">Semua</option></select>
+      <div style="background:var(--bp);border-radius:10px;padding:10px;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:700;color:var(--mt);margin-bottom:6px;text-transform:uppercase">📆 Filter Periode Laporan</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+          <div style="flex:1;min-width:130px">
+            <label style="font-size:10px;color:var(--mt);display:block;margin-bottom:2px">Dari Tanggal</label>
+            <input type="date" id="lap-tgl-mulai" onchange="renderLap()" style="width:100%;padding:7px 10px;border:1px solid var(--br);border-radius:8px;font-size:11px;color:var(--tx);background:#fff;outline:none">
+          </div>
+          <div style="flex:1;min-width:130px">
+            <label style="font-size:10px;color:var(--mt);display:block;margin-bottom:2px">Sampai Tanggal</label>
+            <input type="date" id="lap-tgl-akhir" onchange="renderLap()" style="width:100%;padding:7px 10px;border:1px solid var(--br);border-radius:8px;font-size:11px;color:var(--tx);background:#fff;outline:none">
+          </div>
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">
+          <button onclick="setLapPeriode('thismonth')" style="background:#fff;color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:5px 10px;font-size:10px;font-weight:600;cursor:pointer">📅 Bulan Ini</button>
+          <button onclick="setLapPeriode('lastmonth')" style="background:#fff;color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:5px 10px;font-size:10px;font-weight:600;cursor:pointer">← Bulan Lalu</button>
+          <button onclick="setLapPeriode('week')" style="background:#fff;color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:5px 10px;font-size:10px;font-weight:600;cursor:pointer">7 Hari</button>
+          <button onclick="setLapPeriode('30days')" style="background:#fff;color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:5px 10px;font-size:10px;font-weight:600;cursor:pointer">30 Hari</button>
+        </div>
+        <select id="sel-emp" style="width:100%;padding:8px 10px;border:1px solid var(--br);border-radius:8px;font-size:11px;color:var(--tx);background:#fff;outline:none" onchange="renderLap()"><option value="all">👤 Semua Karyawan</option></select>
       </div>
+      <!-- Hidden untuk kompatibilitas -->
+      <select id="sel-bln" style="display:none"></select>
       <div class="tbl-wrap">
         <table class="lp-tbl">
           <thead><tr><th style="width:28%">Nama</th><th style="width:12%">Hari</th><th style="width:12%">Jam</th><th style="width:28%">Gaji</th><th style="width:20%">Status</th></tr></thead>
@@ -1402,6 +1436,29 @@ async function renderRiwayat(){
   }).join('');
 }
 
+// Helper preset periode untuk Gaji
+function setGajiPeriode(p){
+  const now = new Date();
+  const fmt = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  let start, end;
+  if(p==='thismonth'){
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    end   = new Date(now.getFullYear(), now.getMonth()+1, 0);
+  } else if(p==='lastmonth'){
+    start = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    end   = new Date(now.getFullYear(), now.getMonth(), 0);
+  } else if(p==='week'){
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate()-6);
+    end   = now;
+  } else if(p==='30days'){
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate()-29);
+    end   = now;
+  }
+  document.getElementById('g-tgl-mulai').value = fmt(start);
+  document.getElementById('g-tgl-akhir').value = fmt(end);
+  calcGaji();
+}
+
 // ── GAJI ──────────────────────────────────────────────
 async function calcGaji(){
   const fmt  = v=>'Rp '+v.toLocaleString('id-ID');
@@ -1422,7 +1479,7 @@ async function calcGaji(){
     selEmp.style.display = 'none';
   }
 
-  // Tentukan target user (default: user yang login, admin bisa pilih karyawan)
+  // Tentukan target user
   const targetUid = (isAdmin() && selEmp && selEmp.value) ? selEmp.value : curUser.username;
 
   // Ambil data absensi target user dari Firebase
@@ -1441,34 +1498,22 @@ async function calcGaji(){
 
   const list = fbAbs || getUserAbs(targetUid);
 
-  // Populate dropdown bulan (12 bulan terakhir)
-  const selBln = document.getElementById('g-bulan-filter');
-  if(selBln && selBln.options.length===0){
+  // Set default tanggal jika kosong (bulan ini)
+  const inMulai = document.getElementById('g-tgl-mulai');
+  const inAkhir = document.getElementById('g-tgl-akhir');
+  if(inMulai && !inMulai.value){
     const now = new Date();
-    let html = '';
-    for(let i=0;i<12;i++){
-      const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
-      const val = d.getFullYear()+'-'+(d.getMonth()+1);
-      html += `<option value="${val}">${BL[d.getMonth()]} ${d.getFullYear()}</option>`;
-    }
-    selBln.innerHTML = html;
+    const fmtD = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    inMulai.value = fmtD(new Date(now.getFullYear(), now.getMonth(), 1));
+    inAkhir.value = fmtD(new Date(now.getFullYear(), now.getMonth()+1, 0));
   }
 
-  // Filter bulan terpilih (default: bulan ini)
-  const selVal = selBln ? selBln.value : '';
-  let bln, thn;
-  if(selVal){
-    [thn, bln] = selVal.split('-').map(Number);
-    bln -= 1;
-  } else {
-    const n = new Date();
-    bln = n.getMonth(); thn = n.getFullYear();
-  }
+  // Filter absensi masuk dalam rentang tanggal
+  const tglMulai = inMulai ? new Date(inMulai.value+'T00:00:00').getTime() : 0;
+  const tglAkhir = inAkhir ? new Date(inAkhir.value+'T23:59:59').getTime() : Date.now();
 
-  // Filter absensi masuk di bulan terpilih
   const bList = list.filter(r=>{
-    const d = new Date(r.ms);
-    return d.getMonth()===bln && d.getFullYear()===thn && r.tipe==='masuk';
+    return r.tipe==='masuk' && r.ms>=tglMulai && r.ms<=tglAkhir;
   });
 
   const totMs    = bList.reduce((s,r)=>s+(r.durasiMs||0),0);
@@ -1478,8 +1523,8 @@ async function calcGaji(){
   const totPotong= bList.reduce((s,r)=>s+((r.durasiTotal||0)-(r.durasiMs||0)),0);
   const potongMnt= Math.round(totPotong/60000);
 
-  // Update card ringkasan gaji — kalau admin lihat karyawan lain, beri label nama
-  const sumLabel = (targetUid !== curUser.username) ? '💰 Estimasi Gaji '+targetNama : '💰 Estimasi Gaji Bulan Ini';
+  // Update card ringkasan gaji
+  const sumLabel = (targetUid !== curUser.username) ? '💰 Estimasi Gaji '+targetNama : '💰 Estimasi Gaji Periode Ini';
   const sumLabelEl = document.querySelector('#pg-gaji .gsum .gl');
   if(sumLabelEl) sumLabelEl.textContent = sumLabel;
 
@@ -1507,7 +1552,7 @@ async function calcGaji(){
   if(tglListEl){
     if(bList.length===0){
       const namaInfo = (targetUid !== curUser.username) ? ' ('+targetNama+')' : '';
-      tglListEl.innerHTML = '<div class="empty" style="padding:20px"><i class="ti ti-calendar-off"></i><p style="font-size:11px;color:var(--mt)">Belum ada absensi di bulan ini'+namaInfo+'</p></div>';
+      tglListEl.innerHTML = '<div class="empty" style="padding:20px"><i class="ti ti-calendar-off"></i><p style="font-size:11px;color:var(--mt)">Belum ada absensi di periode ini'+namaInfo+'</p></div>';
     } else {
       const sortedB = [...bList].sort((a,b)=>(b.ms||0)-(a.ms||0));
       const HARI = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
@@ -2090,19 +2135,45 @@ function hapusEmp(uid,nama){
 }
 
 // ── ADMIN LAPORAN ─────────────────────────────────────
+// Helper preset periode untuk Laporan
+function setLapPeriode(p){
+  const now = new Date();
+  const fmt = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  let start, end;
+  if(p==='thismonth'){
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    end   = new Date(now.getFullYear(), now.getMonth()+1, 0);
+  } else if(p==='lastmonth'){
+    start = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    end   = new Date(now.getFullYear(), now.getMonth(), 0);
+  } else if(p==='week'){
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate()-6);
+    end   = now;
+  } else if(p==='30days'){
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate()-29);
+    end   = now;
+  }
+  document.getElementById('lap-tgl-mulai').value = fmt(start);
+  document.getElementById('lap-tgl-akhir').value = fmt(end);
+  renderLap();
+}
+
 async function populateLapFilter(){
-  const sel=document.getElementById('sel-bln');if(!sel)return;
-  const now=new Date();sel.innerHTML='';
-  for(let i=0;i<12;i++){
-    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
-    sel.innerHTML+=`<option value="${d.getFullYear()+'-'+(d.getMonth()+1)}">${BL[d.getMonth()]} ${d.getFullYear()}</option>`;
+  // Set default tanggal (bulan ini) jika kosong
+  const inMulai = document.getElementById('lap-tgl-mulai');
+  const inAkhir = document.getElementById('lap-tgl-akhir');
+  if(inMulai && !inMulai.value){
+    const now = new Date();
+    const fmtD = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    inMulai.value = fmtD(new Date(now.getFullYear(), now.getMonth(), 1));
+    inAkhir.value = fmtD(new Date(now.getFullYear(), now.getMonth()+1, 0));
   }
   // Ambil users terbaru dari Firebase
   const fbUsers=await FB.get('users');
   const users=fbUsers||getUsers();
   if(fbUsers) DB.setLocal('users',fbUsers);
   const selE=document.getElementById('sel-emp');if(!selE)return;
-  selE.innerHTML='<option value="all">Semua Karyawan</option>';
+  selE.innerHTML='<option value="all">👤 Semua Karyawan</option>';
   Object.entries(users).filter(([,u])=>u.role!=='admin').forEach(([uid,u])=>{
     selE.innerHTML+=`<option value="${uid}">${u.nama}</option>`;
   });
@@ -2110,10 +2181,23 @@ async function populateLapFilter(){
 }
 
 async function renderLap(){
-  const selB=document.getElementById('sel-bln');if(!selB||!selB.value)return;
-  const[thn,bln]=selB.value.split('-').map(Number);
+  const inMulai = document.getElementById('lap-tgl-mulai');
+  const inAkhir = document.getElementById('lap-tgl-akhir');
+  if(!inMulai || !inMulai.value){
+    // Set default jika belum
+    const now = new Date();
+    const fmtD = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    if(inMulai){
+      inMulai.value = fmtD(new Date(now.getFullYear(), now.getMonth(), 1));
+      inAkhir.value = fmtD(new Date(now.getFullYear(), now.getMonth()+1, 0));
+    }
+  }
+
+  const tglMulai = new Date(inMulai.value+'T00:00:00').getTime();
+  const tglAkhir = new Date(inAkhir.value+'T23:59:59').getTime();
   const empF=(document.getElementById('sel-emp')||{value:'all'}).value;
-  // Selalu ambil data terbaru dari Firebase
+
+  // Ambil data terbaru dari Firebase
   const [fbUsers,fbAbsensi,fbCfg]= await Promise.all([FB.get('users'),FB.get('absensi'),FB.get('config')]);
   const users  = fbUsers   || getUsers();
   const absensi= fbAbsensi || getAllAbsensi();
@@ -2127,7 +2211,7 @@ async function renderLap(){
   const fmt=v=>'Rp '+v.toLocaleString('id-ID');
   let gtotal=0,gjam=0;
   document.getElementById('lap-body').innerHTML=rows.map(([uid,u])=>{
-    const list=(absensi[uid]||[]).filter(r=>{const d=new Date(r.ms);return d.getFullYear()===thn&&d.getMonth()+1===bln&&r.tipe==='masuk';});
+    const list=(absensi[uid]||[]).filter(r=>r.tipe==='masuk' && r.ms>=tglMulai && r.ms<=tglAkhir);
     const jam =Math.round(list.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000*10)/10;
     const hari=list.length,gaji=Math.round(jam*cfg.tarifJam);
     gtotal+=gaji;gjam+=jam;
@@ -2141,15 +2225,22 @@ async function renderLap(){
   }).join('');
   document.getElementById('lap-total-n').textContent=fmt(gtotal);
   const iLabel=cfg.istirahatMulai?' (dipotong istirahat '+cfg.istirahatMulai+'–'+cfg.istirahatSelesai+')':'';
-  document.getElementById('lap-total-d').textContent=rows.length+' karyawan · '+Math.round(gjam*10)/10+' jam'+iLabel;
+  const periodStr = new Date(inMulai.value).toLocaleDateString('id-ID')+' s/d '+new Date(inAkhir.value).toLocaleDateString('id-ID');
+  document.getElementById('lap-total-d').textContent='📆 '+periodStr+' · '+rows.length+' karyawan · '+Math.round(gjam*10)/10+' jam'+iLabel;
 }
 
 async function exportCSV(){
   guardAdmin(async ()=>{
     toast('⏳ Menyiapkan laporan...','');
-    const selB=document.getElementById('sel-bln');
-    const[thn,bln]=selB.value.split('-').map(Number);
-    const blnNm=BL[bln-1]+' '+thn;
+    const inMulai = document.getElementById('lap-tgl-mulai');
+    const inAkhir = document.getElementById('lap-tgl-akhir');
+    if(!inMulai || !inMulai.value){toast('❗ Pilih rentang tanggal dulu','er');return;}
+    const tglMulai = new Date(inMulai.value+'T00:00:00').getTime();
+    const tglAkhir = new Date(inAkhir.value+'T23:59:59').getTime();
+    const tglMulaiStr = new Date(inMulai.value).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+    const tglAkhirStr = new Date(inAkhir.value).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+    const periodeStr  = tglMulaiStr+' s/d '+tglAkhirStr;
+    const periodeShort= inMulai.value+'_'+inAkhir.value;
     const empF=(document.getElementById('sel-emp')||{value:'all'}).value;
 
     // Ambil data terbaru dari Firebase
@@ -2165,7 +2256,7 @@ async function exportCSV(){
     // Hitung total
     let totHari=0, totJam=0, totGaji=0;
     const dataRows = rows.map(([uid,u])=>{
-      const list=(absensi[uid]||[]).filter(r=>{const d=new Date(r.ms);return d.getFullYear()===thn&&d.getMonth()+1===bln&&r.tipe==='masuk';});
+      const list=(absensi[uid]||[]).filter(r=>r.tipe==='masuk' && r.ms>=tglMulai && r.ms<=tglAkhir);
       const jam = Math.round(list.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000*10)/10;
       const gaji= Math.round(jam*cfg.tarifJam);
       totHari += list.length; totJam += jam; totGaji += gaji;
@@ -2173,13 +2264,12 @@ async function exportCSV(){
     });
     totJam = Math.round(totJam*10)/10;
 
-    // Buat tabel HTML yang akan dibaca Excel sebagai spreadsheet
     const tglCetak = new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
     const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
 <head>
 <meta charset="UTF-8">
 <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
-<x:Name>Laporan ${blnNm}</x:Name>
+<x:Name>Laporan</x:Name>
 <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
 </x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
 <style>
@@ -2198,7 +2288,8 @@ async function exportCSV(){
 </head><body>
 <table>
   <tr><td colspan="7" class="title">${cfg.perusahaan||'OWL Absensi'} — Laporan Absensi</td></tr>
-  <tr><td colspan="7" class="sub">Periode: <b>${blnNm}</b> · Tarif: Rp ${fmt(cfg.tarifJam)}/jam · Dicetak: ${tglCetak}</td></tr>
+  <tr><td colspan="7" class="sub">📆 Periode: <b>${periodeStr}</b></td></tr>
+  <tr><td colspan="7" class="sub">Tarif: Rp ${fmt(cfg.tarifJam)}/jam · Dicetak: ${tglCetak}</td></tr>
   <tr><td colspan="7" style="height:8px;border:none"></td></tr>
   <tr class="hdr">
     <th style="width:40px">No</th>
@@ -2229,6 +2320,7 @@ async function exportCSV(){
 <br>
 <table>
   <tr><td colspan="2" class="hdr" style="background:#475569">📊 Ringkasan</td></tr>
+  <tr><td>Periode Laporan</td><td><b>${periodeStr}</b></td></tr>
   <tr><td>Total Karyawan</td><td class="cn"><b>${rows.length}</b></td></tr>
   <tr><td>Total Hari Kerja</td><td class="cn"><b>${totHari} hari</b></td></tr>
   <tr><td>Total Jam Kerja</td><td class="cn"><b>${totJam} jam</b></td></tr>
@@ -2237,12 +2329,11 @@ async function exportCSV(){
 </table>
 </body></html>`;
 
-    // Trigger download sebagai file .xls (Excel akan buka sebagai spreadsheet)
     const blob = new Blob(['\uFEFF'+html], {type:'application/vnd.ms-excel'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'Laporan_Absensi_'+blnNm.replace(' ','_')+'.xls';
+    a.download = 'Laporan_Absensi_'+periodeShort+'.xls';
     document.body.appendChild(a);
     a.click();
     setTimeout(()=>{URL.revokeObjectURL(url); a.remove();}, 100);
