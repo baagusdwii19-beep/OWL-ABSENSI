@@ -339,6 +339,13 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
       <div class="sec"><i class="ti ti-calendar"></i> Rincian Per Minggu</div>
       <div id="g-minggu"></div>
     </div>
+    <div class="gcard">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div class="sec" style="margin-bottom:0"><i class="ti ti-calendar-event"></i> Rincian Per Tanggal</div>
+        <select id="g-bulan-filter" onchange="calcGaji()" style="padding:6px 10px;border:1px solid var(--br);border-radius:9px;font-size:11px;color:var(--tx);background:#fff;outline:none"></select>
+      </div>
+      <div id="g-tanggal-list" style="max-height:400px;overflow-y:auto"></div>
+    </div>
   </div>
 
   <!-- NOTIF -->
@@ -1399,14 +1406,43 @@ async function calcGaji(){
   const cfg   = fbCfg || getCfg();
   if(fbCfg) DB.setLocal('config', fbCfg);
 
-  const list  = fbAbs || getUserAbs(curUser.username);
-  const n     = new Date(), bln=n.getMonth(), thn=n.getFullYear();
-  const bList = list.filter(r=>{const d=new Date(r.ms);return d.getMonth()===bln&&d.getFullYear()===thn&&r.tipe==='masuk';});
+  const list = fbAbs || getUserAbs(curUser.username);
+  const fmt  = v=>'Rp '+v.toLocaleString('id-ID');
+
+  // Populate dropdown bulan (12 bulan terakhir)
+  const selBln = document.getElementById('g-bulan-filter');
+  if(selBln && selBln.options.length===0){
+    const now = new Date();
+    let html = '';
+    for(let i=0;i<12;i++){
+      const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+      const val = d.getFullYear()+'-'+(d.getMonth()+1);
+      html += `<option value="${val}">${BL[d.getMonth()]} ${d.getFullYear()}</option>`;
+    }
+    selBln.innerHTML = html;
+  }
+
+  // Filter bulan terpilih (default: bulan ini)
+  const selVal = selBln ? selBln.value : '';
+  let bln, thn;
+  if(selVal){
+    [thn, bln] = selVal.split('-').map(Number);
+    bln -= 1;
+  } else {
+    const n = new Date();
+    bln = n.getMonth(); thn = n.getFullYear();
+  }
+
+  // Filter absensi masuk di bulan terpilih
+  const bList = list.filter(r=>{
+    const d = new Date(r.ms);
+    return d.getMonth()===bln && d.getFullYear()===thn && r.tipe==='masuk';
+  });
+
   const totMs    = bList.reduce((s,r)=>s+(r.durasiMs||0),0);
   const totJam   = Math.round(totMs/3600000*10)/10;
   const totHari  = bList.length;
   const total    = Math.round(totJam*cfg.tarifJam);
-  const fmt      = v=>'Rp '+v.toLocaleString('id-ID');
   const totPotong= bList.reduce((s,r)=>s+((r.durasiTotal||0)-(r.durasiMs||0)),0);
   const potongMnt= Math.round(totPotong/60000);
 
@@ -1416,16 +1452,71 @@ async function calcGaji(){
   document.getElementById('g-jam').textContent    = totJam+' jam';
   document.getElementById('g-total2').textContent = fmt(total);
   document.getElementById('g-tarif').textContent  = fmt(cfg.tarifJam);
-  document.getElementById('info-tarif').textContent = cfg.tarifJam.toLocaleString('id-ID');
+  const itEl = document.getElementById('info-tarif');
+  if(itEl) itEl.textContent = cfg.tarifJam.toLocaleString('id-ID');
 
+  // Rincian per minggu
   const wk=['Minggu 1 (1–7)','Minggu 2 (8–14)','Minggu 3 (15–21)','Minggu 4 (22–31)'];
   const wMs=[0,0,0,0];
   bList.forEach(r=>{const d=new Date(r.ms).getDate();wMs[d<=7?0:d<=14?1:d<=21?2:3]+=(r.durasiMs||0);});
   const iInfo=cfg.istirahatMulai?`<div class="gr-row" style="border-top:1px dashed var(--br)"><span class="grl">⏸ Potongan istirahat</span><span class="grv" style="color:var(--am)">${potongMnt} menit terpotong</span></div>`:'';
   document.getElementById('g-minggu').innerHTML=wk.map((w,i)=>{
-    const jm=Math.round(wMs[i]/3600000*10)/10,gj=Math.round(jm*cfg.tarifJam);
+    const jm=Math.round(wMs[i]/3600000*10)/10, gj=Math.round(jm*cfg.tarifJam);
     return `<div class="gr-row"><span class="grl">${w}</span><span class="grv">${jm} jam · ${fmt(gj)}</span></div>`;
   }).join('')+iInfo;
+
+  // ── Rincian Per Tanggal ───────────────────────────
+  const tglListEl = document.getElementById('g-tanggal-list');
+  if(tglListEl){
+    if(bList.length===0){
+      tglListEl.innerHTML = '<div class="empty" style="padding:20px"><i class="ti ti-calendar-off"></i><p style="font-size:11px;color:var(--mt)">Belum ada absensi di bulan ini</p></div>';
+    } else {
+      // Urutkan dari tanggal terbaru
+      const sortedB = [...bList].sort((a,b)=>(b.ms||0)-(a.ms||0));
+      // Cari pasangan keluar untuk tiap masuk
+      const HARI = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+      tglListEl.innerHTML = sortedB.map(r=>{
+        const d        = new Date(r.ms);
+        const tgl      = d.getDate();
+        const hariNm   = HARI[d.getDay()];
+        const blnNm    = BL[d.getMonth()].slice(0,3);
+        const jamMs    = r.durasiMs||0;
+        const jamKerja = Math.round(jamMs/3600000*10)/10;
+        const gajiHari = Math.round(jamKerja*cfg.tarifJam);
+        // Cari pasangan keluar
+        const keluar   = list.find(x=>x.tgl===r.tgl && x.tipe==='keluar');
+        const jamMasukStr  = r.jam || '--:--';
+        const jamKeluarStr = keluar ? keluar.jam : '--:--';
+        const statusTag = r.terlambat
+          ? '<span class="bdg bdg-a" style="font-size:9px;padding:2px 6px">Terlambat</span>'
+          : (jamMs>0 ? '<span class="bdg bdg-g" style="font-size:9px;padding:2px 6px">Selesai</span>'
+                    : '<span class="bdg" style="background:#e0e7ff;color:#3730a3;font-size:9px;padding:2px 6px">Belum Keluar</span>');
+        const manualTag = r.manual ? '<span class="bdg" style="background:#fef3c7;color:#92400e;font-size:9px;padding:2px 6px;margin-left:4px">Manual</span>' : '';
+
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 4px;border-bottom:1px solid var(--bp);gap:8px">
+          <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+            <div style="background:var(--bp);color:var(--bd);border-radius:9px;padding:6px 10px;text-align:center;min-width:42px">
+              <div style="font-size:9px;font-weight:600;color:var(--mt);text-transform:uppercase">${hariNm}</div>
+              <div style="font-size:16px;font-weight:800;line-height:1">${tgl}</div>
+              <div style="font-size:8px;color:var(--mt);text-transform:uppercase">${blnNm}</div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:11px;font-weight:700;color:var(--tx);margin-bottom:2px">
+                🕐 ${jamMasukStr} → ${jamKeluarStr} ${manualTag}
+              </div>
+              <div style="font-size:10px;color:var(--mt)">
+                ${statusTag} · ${jamKerja} jam efektif
+              </div>
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:13px;font-weight:800;color:var(--bd)">${fmt(gajiHari)}</div>
+            <div style="font-size:9px;color:var(--mt)">${jamKerja>0?'Rp '+cfg.tarifJam.toLocaleString('id-ID')+'/jam':'-'}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
 }
 
 // ── NOTIF ─────────────────────────────────────────────
