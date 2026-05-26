@@ -446,7 +446,39 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
           <a id="preview-maps-link2" href="#" target="_blank" style="color:#0ea5e9;font-weight:700;font-size:11px;display:inline-block;margin-top:4px">🗺️ Lihat di Google Maps</a>
         </div>
 
-        <label class="flbl">Maksimal Radius Absen (berlaku untuk kedua lokasi)</label>
+        <div style="height:1px;background:var(--br);margin:4px 0 14px"></div>
+        <div class="sec" style="font-size:12px"><i class="ti ti-map-pin"></i> Lokasi Kantor 3 (Opsional)</div>
+        <label class="flbl">Nama Lokasi 3</label>
+        <input type="text" class="fin" id="cfg-nama3" placeholder="Contoh: Gudang Utara">
+        <label class="flbl">Latitude Lokasi 3</label>
+        <input type="text" class="fin" id="cfg-lat3" placeholder="Contoh: -7.218000">
+        <label class="flbl">Longitude Lokasi 3</label>
+        <input type="text" class="fin" id="cfg-lon3" placeholder="Contoh: 112.631000">
+        <button class="btn btn-w" style="margin-bottom:10px" onclick="ambilKoordinatKantor(3)">
+          <i class="ti ti-current-location"></i> Ambil Koordinat Posisi Saya (Lokasi 3)
+        </button>
+        <div id="preview-koordinat3" style="display:none;background:var(--bp);border:1px solid var(--br);border-radius:10px;padding:10px;margin-bottom:12px;font-size:11px">
+          <div id="preview-koordinat-text3"></div>
+          <a id="preview-maps-link3" href="#" target="_blank" style="color:#0ea5e9;font-weight:700;font-size:11px;display:inline-block;margin-top:4px">🗺️ Lihat di Google Maps</a>
+        </div>
+
+        <div style="height:1px;background:var(--br);margin:4px 0 14px"></div>
+        <div class="sec" style="font-size:12px"><i class="ti ti-map-pin"></i> Lokasi Kantor 4 (Opsional)</div>
+        <label class="flbl">Nama Lokasi 4</label>
+        <input type="text" class="fin" id="cfg-nama4" placeholder="Contoh: Gudang Selatan">
+        <label class="flbl">Latitude Lokasi 4</label>
+        <input type="text" class="fin" id="cfg-lat4" placeholder="Contoh: -7.418000">
+        <label class="flbl">Longitude Lokasi 4</label>
+        <input type="text" class="fin" id="cfg-lon4" placeholder="Contoh: 112.831000">
+        <button class="btn btn-w" style="margin-bottom:10px" onclick="ambilKoordinatKantor(4)">
+          <i class="ti ti-current-location"></i> Ambil Koordinat Posisi Saya (Lokasi 4)
+        </button>
+        <div id="preview-koordinat4" style="display:none;background:var(--bp);border:1px solid var(--br);border-radius:10px;padding:10px;margin-bottom:12px;font-size:11px">
+          <div id="preview-koordinat-text4"></div>
+          <a id="preview-maps-link4" href="#" target="_blank" style="color:#0ea5e9;font-weight:700;font-size:11px;display:inline-block;margin-top:4px">🗺️ Lihat di Google Maps</a>
+        </div>
+
+        <label class="flbl">Maksimal Radius Absen (berlaku untuk semua lokasi)</label>
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
           <input type="range" id="cfg-radius" min="50" max="1000" step="50" value="200"
             oninput="document.getElementById('radius-val').textContent=this.value+' meter'"
@@ -1556,6 +1588,18 @@ async function lihatRiwayatKaryawan(uid, nama){
 
     document.getElementById('riw-kry-title').textContent = '📋 Riwayat: '+nama;
 
+    // Tambahkan tombol "Tambah Absensi Manual"
+    let addBtn = document.getElementById('riw-kry-add-btn');
+    if(!addBtn){
+      addBtn = document.createElement('button');
+      addBtn.id = 'riw-kry-add-btn';
+      addBtn.className = 'btn btn-b';
+      addBtn.style.cssText = 'width:100%;margin-bottom:12px;padding:10px';
+      addBtn.innerHTML = '<i class="ti ti-plus"></i> Tambah Absensi Manual (Lupa Absen)';
+      document.getElementById('riw-kry-summary').after(addBtn);
+    }
+    addBtn.onclick = ()=> tambahAbsensiManual(uid, nama);
+
     if(!list.length){
       document.getElementById('riw-kry-summary').textContent = 'Belum ada absensi';
       document.getElementById('riw-kry-list').innerHTML = '<div class="empty"><i class="ti ti-clock-off"></i><p>Karyawan belum pernah absen</p></div>';
@@ -1569,13 +1613,15 @@ async function lihatRiwayatKaryawan(uid, nama){
 
       // Urutkan terbaru di atas
       const sorted = [...list].sort((a,b)=>(b.ms||0)-(a.ms||0));
-      document.getElementById('riw-kry-list').innerHTML = sorted.map(r=>{
+      document.getElementById('riw-kry-list').innerHTML = sorted.map((r,idx)=>{
         const isMasuk = r.tipe==='masuk';
         const bgIc = isMasuk?(r.terlambat?'#fef3c7':'#dcfce7'):'#fee2e2';
         const cIc  = isMasuk?(r.terlambat?'#b45309':'#15803d'):'#dc2626';
         const ic   = isMasuk?'login':'logout';
         const dur  = r.durasi?'<div style="font-size:10px;color:var(--mt);margin-top:3px">⏱️ '+r.durasi+'</div>':'';
         const tag  = r.terlambat?'<span class="bdg bdg-a" style="font-size:9px">Terlambat</span>':'';
+        // Index di list asli (sebelum sort) untuk referensi edit
+        const origIdx = list.indexOf(r);
         return `<div class="emp-item" style="border:1px solid var(--br);border-radius:11px;padding:10px;margin-bottom:8px">
           <div class="emp-av" style="background:${bgIc};color:${cIc}"><i class="ti ti-${ic}" style="font-size:18px"></i></div>
           <div class="emp-tx" style="flex:1">
@@ -1584,11 +1630,189 @@ async function lihatRiwayatKaryawan(uid, nama){
             <div class="ed" style="font-size:10px">📍 ${r.lokasi||'-'}</div>
             ${dur}
           </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <button class="ic-btn edit" onclick="editJamAbsensi('${uid}',${origIdx})" title="Edit Jam"><i class="ti ti-edit"></i></button>
+            <button class="ic-btn del" onclick="hapusAbsensi('${uid}',${origIdx},'${nama.replace(/'/g,"\\'")}')" title="Hapus"><i class="ti ti-trash"></i></button>
+          </div>
         </div>`;
       }).join('');
     }
 
     openMd('mdRiwayatKry');
+  });
+}
+
+// Edit jam absensi karyawan
+async function editJamAbsensi(uid, idx){
+  guardAdmin(async ()=>{
+    const list = await FB.get('absensi/'+uid) || [];
+    const r = list[idx];
+    if(!r){ toast('❗ Data tidak ditemukan','er'); return; }
+
+    const jamLama = r.jam || '00:00';
+    const jamBaru = prompt(
+      `Edit jam ${r.tipe==='masuk'?'masuk':'keluar'} untuk tanggal ${r.tgl}\n\n` +
+      `Jam saat ini: ${jamLama}\n\nMasukkan jam baru (format HH:MM):`,
+      jamLama
+    );
+    if(!jamBaru) return;
+
+    // Validasi format
+    if(!/^([01]\d|2[0-3]):([0-5]\d)$/.test(jamBaru)){
+      toast('❗ Format jam tidak valid! Gunakan HH:MM (contoh: 08:30)','er');
+      return;
+    }
+
+    // Update jam dan timestamp ms
+    const [jH,jM] = jamBaru.split(':').map(Number);
+    const dOld = new Date(r.ms||Date.now());
+    const dNew = new Date(dOld.getFullYear(), dOld.getMonth(), dOld.getDate(), jH, jM, 0);
+    r.jam = jamBaru;
+    r.ms  = dNew.getTime();
+
+    // Cek apakah terlambat (untuk absen masuk)
+    if(r.tipe==='masuk'){
+      const cfg = getCfg();
+      const [mH,mM] = (cfg.jamMasuk||'08:00').split(':').map(Number);
+      r.terlambat = (jH*60+jM) > (mH*60+mM);
+    }
+
+    // Jika ada pasangan masuk/keluar di tanggal yang sama, recalculate durasi
+    const sameDay = list.filter(x=>x.tgl===r.tgl);
+    const masuk   = sameDay.find(x=>x.tipe==='masuk');
+    const keluar  = sameDay.find(x=>x.tipe==='keluar');
+    if(masuk && keluar){
+      const cfg = getCfg();
+      const efektif = hitungDurasiEfektif(masuk.ms, keluar.ms, cfg);
+      const totalMs = keluar.ms - masuk.ms;
+      const j = Math.floor(efektif/3600000);
+      const m = Math.floor((efektif%3600000)/60000);
+      const durStr = j+'j '+m+'m';
+      keluar.durasi = durStr;
+      keluar.durasiMs = efektif;
+      keluar.durasiTotal = totalMs;
+    }
+
+    // Simpan ke Firebase
+    toast('⏳ Menyimpan perubahan...','');
+    const ok = await FB.set('absensi/'+uid, list);
+    if(ok){
+      DB.setLocal('absensi', {...getAllAbsensi(), [uid]: list});
+      toast('✅ Jam absensi berhasil diubah!','ok');
+      // Refresh modal riwayat
+      const u = (await FB.get('users/'+uid)) || getUsers()[uid];
+      if(u) lihatRiwayatKaryawan(uid, u.nama);
+      renderAdminDash();
+    } else {
+      toast('❗ Gagal menyimpan ke server','er');
+    }
+  });
+}
+
+// Hapus absensi
+async function hapusAbsensi(uid, idx, nama){
+  guardAdmin(async ()=>{
+    const list = await FB.get('absensi/'+uid) || [];
+    const r = list[idx];
+    if(!r){ toast('❗ Data tidak ditemukan','er'); return; }
+
+    if(!confirm(`Hapus absensi ${r.tipe} tanggal ${r.tgl} jam ${r.jam}?`)) return;
+
+    list.splice(idx, 1);
+    toast('⏳ Menghapus...','');
+    const ok = await FB.set('absensi/'+uid, list);
+    if(ok){
+      DB.setLocal('absensi', {...getAllAbsensi(), [uid]: list});
+      toast('🗑️ Absensi dihapus','ok');
+      lihatRiwayatKaryawan(uid, nama);
+      renderAdminDash();
+    } else {
+      toast('❗ Gagal hapus','er');
+    }
+  });
+}
+
+// Tambah absensi manual (untuk karyawan yang lupa absen)
+async function tambahAbsensiManual(uid, nama){
+  guardAdmin(async ()=>{
+    const today  = new Date();
+    const tglDef = today.toLocaleDateString('id-ID');
+    const tipe   = prompt('Tipe absensi:\n\nKetik "masuk" atau "keluar"', 'masuk');
+    if(!tipe || !['masuk','keluar'].includes(tipe.toLowerCase().trim())){
+      toast('❗ Tipe harus "masuk" atau "keluar"','er'); return;
+    }
+    const tipeFinal = tipe.toLowerCase().trim();
+
+    const tgl = prompt('Tanggal absensi (format: DD/MM/YYYY):\n\nContoh: 23/5/2026', tglDef);
+    if(!tgl) return;
+    // Parse tanggal
+    const parts = tgl.split('/');
+    if(parts.length!==3){ toast('❗ Format tanggal salah','er'); return; }
+    const [d,m,y] = parts.map(Number);
+    if(!d||!m||!y){ toast('❗ Format tanggal salah','er'); return; }
+
+    const jam = prompt(`Jam absen ${tipeFinal} (format HH:MM):\n\nContoh: 08:00`, tipeFinal==='masuk'?'08:00':'17:00');
+    if(!jam) return;
+    if(!/^([01]\d|2[0-3]):([0-5]\d)$/.test(jam)){
+      toast('❗ Format jam tidak valid','er'); return;
+    }
+    const [jH,jM] = jam.split(':').map(Number);
+
+    const lokasi = prompt('Lokasi (opsional, contoh: Kantor Pusat):', 'Kantor Pusat') || '-';
+
+    // Build record
+    const ms = new Date(y, m-1, d, jH, jM, 0).getTime();
+    const cfg = getCfg();
+    const newRec = {
+      tipe: tipeFinal,
+      jam: jam,
+      tgl: d+'/'+m+'/'+y,
+      ms: ms,
+      lokasi: lokasi,
+      foto: '',
+      manual: true // tanda bahwa ini ditambahkan manual oleh admin
+    };
+
+    // Cek terlambat untuk absen masuk
+    if(tipeFinal==='masuk'){
+      const [mH,mM] = (cfg.jamMasuk||'08:00').split(':').map(Number);
+      newRec.terlambat = (jH*60+jM) > (mH*60+mM);
+    }
+
+    // Ambil list yang ada
+    const list = await FB.get('absensi/'+uid) || [];
+
+    // Cek duplikat (tipe & tanggal sama)
+    if(list.some(r=>r.tgl===newRec.tgl && r.tipe===newRec.tipe)){
+      if(!confirm(`Sudah ada absen ${tipeFinal} di tanggal ini. Tetap tambahkan?`)) return;
+    }
+
+    list.push(newRec);
+
+    // Recalculate durasi kalau ada pasangan masuk-keluar
+    const sameDay = list.filter(x=>x.tgl===newRec.tgl);
+    const masuk   = sameDay.find(x=>x.tipe==='masuk');
+    const keluar  = sameDay.find(x=>x.tipe==='keluar');
+    if(masuk && keluar){
+      const efektif = hitungDurasiEfektif(masuk.ms, keluar.ms, cfg);
+      const totalMs = keluar.ms - masuk.ms;
+      const j = Math.floor(efektif/3600000);
+      const m = Math.floor((efektif%3600000)/60000);
+      keluar.durasi = j+'j '+m+'m';
+      keluar.durasiMs = efektif;
+      keluar.durasiTotal = totalMs;
+    }
+
+    toast('⏳ Menyimpan...','');
+    const ok = await FB.set('absensi/'+uid, list);
+    if(ok){
+      DB.setLocal('absensi', {...getAllAbsensi(), [uid]: list});
+      toast('✅ Absensi manual berhasil ditambahkan!','ok');
+      lihatRiwayatKaryawan(uid, nama);
+      renderAdminDash();
+    } else {
+      toast('❗ Gagal menyimpan','er');
+    }
   });
 }
 
@@ -1825,6 +2049,12 @@ async function loadSetting(){
   document.getElementById('cfg-nama2').value             = cfg.namaLokasi2||'';
   document.getElementById('cfg-lat2').value              = cfg.latKantor2||'';
   document.getElementById('cfg-lon2').value              = cfg.lonKantor2||'';
+  document.getElementById('cfg-nama3').value             = cfg.namaLokasi3||'';
+  document.getElementById('cfg-lat3').value              = cfg.latKantor3||'';
+  document.getElementById('cfg-lon3').value              = cfg.lonKantor3||'';
+  document.getElementById('cfg-nama4').value             = cfg.namaLokasi4||'';
+  document.getElementById('cfg-lat4').value              = cfg.latKantor4||'';
+  document.getElementById('cfg-lon4').value              = cfg.lonKantor4||'';
   const radius = cfg.radiusAbsen||200;
   document.getElementById('cfg-radius').value            = radius;
   document.getElementById('radius-val').textContent      = radius+' meter';
@@ -1835,6 +2065,8 @@ async function loadSetting(){
   document.getElementById('cfg-tarif').value             = cfg.tarifJam||12500;
   if(cfg.latKantor&&cfg.lonKantor)   updatePreviewKoordinat(cfg.latKantor,cfg.lonKantor,1);
   if(cfg.latKantor2&&cfg.lonKantor2) updatePreviewKoordinat(cfg.latKantor2,cfg.lonKantor2,2);
+  if(cfg.latKantor3&&cfg.lonKantor3) updatePreviewKoordinat(cfg.latKantor3,cfg.lonKantor3,3);
+  if(cfg.latKantor4&&cfg.lonKantor4) updatePreviewKoordinat(cfg.latKantor4,cfg.lonKantor4,4);
   updateInfoIstirahat();
   updatePreviewGaji();
   // Tampilkan riwayat backup otomatis
@@ -1857,14 +2089,16 @@ async function loadSetting(){
 function saveSetting(){
   guardAdmin(async ()=>{
     const val=(id,def='')=>{const el=document.getElementById(id);return el?el.value:def;};
-    const lat=val('cfg-lat').trim(), lon=val('cfg-lon').trim();
+    const lat =val('cfg-lat').trim(),  lon =val('cfg-lon').trim();
     const lat2=val('cfg-lat2').trim(), lon2=val('cfg-lon2').trim();
+    const lat3=val('cfg-lat3').trim(), lon3=val('cfg-lon3').trim();
+    const lat4=val('cfg-lat4').trim(), lon4=val('cfg-lon4').trim();
     const valKoord=(la,lo,nm)=>{
       if(la&&(isNaN(parseFloat(la))||parseFloat(la)<-90||parseFloat(la)>90)){toast('❗ Latitude '+nm+' tidak valid!','er');return false;}
       if(lo&&(isNaN(parseFloat(lo))||parseFloat(lo)<-180||parseFloat(lo)>180)){toast('❗ Longitude '+nm+' tidak valid!','er');return false;}
       return true;
     };
-    if(!valKoord(lat,lon,'Lokasi 1')||!valKoord(lat2,lon2,'Lokasi 2')) return;
+    if(!valKoord(lat,lon,'Lokasi 1')||!valKoord(lat2,lon2,'Lokasi 2')||!valKoord(lat3,lon3,'Lokasi 3')||!valKoord(lat4,lon4,'Lokasi 4')) return;
     const iMulai=val('cfg-istirahat-mulai','12:00'), iSelesai=val('cfg-istirahat-selesai','13:00');
     if(iMulai>=iSelesai){toast('❗ Jam selesai istirahat harus setelah jam mulai!','er');return;}
     const cfg={
@@ -1872,6 +2106,8 @@ function saveSetting(){
       namaLokasi1:val('cfg-nama1')||'Kantor Pusat',
       latKantor:lat?parseFloat(lat).toFixed(6):'', lonKantor:lon?parseFloat(lon).toFixed(6):'',
       namaLokasi2:val('cfg-nama2'), latKantor2:lat2?parseFloat(lat2).toFixed(6):'', lonKantor2:lon2?parseFloat(lon2).toFixed(6):'',
+      namaLokasi3:val('cfg-nama3'), latKantor3:lat3?parseFloat(lat3).toFixed(6):'', lonKantor3:lon3?parseFloat(lon3).toFixed(6):'',
+      namaLokasi4:val('cfg-nama4'), latKantor4:lat4?parseFloat(lat4).toFixed(6):'', lonKantor4:lon4?parseFloat(lon4).toFixed(6):'',
       radiusAbsen:parseInt(val('cfg-radius','200'))||200,
       jamMasuk:val('cfg-jam-masuk','08:00'), jamKeluar:val('cfg-jam-keluar','17:00'),
       istirahatMulai:iMulai, istirahatSelesai:iSelesai,
@@ -1881,8 +2117,10 @@ function saveSetting(){
     await FB.set('config', cfg);
     const tEl=document.getElementById('g-tarif'); if(tEl) tEl.textContent='Rp '+cfg.tarifJam.toLocaleString('id-ID');
     const iEl=document.getElementById('info-tarif'); if(iEl) iEl.textContent=cfg.tarifJam.toLocaleString('id-ID');
-    if(lat&&lon) updatePreviewKoordinat(cfg.latKantor,cfg.lonKantor,1);
+    if(lat&&lon)   updatePreviewKoordinat(cfg.latKantor,cfg.lonKantor,1);
     if(lat2&&lon2) updatePreviewKoordinat(cfg.latKantor2,cfg.lonKantor2,2);
+    if(lat3&&lon3) updatePreviewKoordinat(cfg.latKantor3,cfg.lonKantor3,3);
+    if(lat4&&lon4) updatePreviewKoordinat(cfg.latKantor4,cfg.lonKantor4,4);
     updateInfoIstirahat(); updatePreviewGaji();
     toast('✅ Pengaturan berhasil disimpan!','ok');
   });
@@ -1929,15 +2167,11 @@ function ambilKoordinatKantor(no){
     pos=>{
       const lat=pos.coords.latitude.toFixed(6);
       const lon=pos.coords.longitude.toFixed(6);
-      if(no===1){
-        document.getElementById('cfg-lat').value=lat;
-        document.getElementById('cfg-lon').value=lon;
-        updatePreviewKoordinat(lat,lon,1);
-      } else {
-        document.getElementById('cfg-lat2').value=lat;
-        document.getElementById('cfg-lon2').value=lon;
-        updatePreviewKoordinat(lat,lon,2);
-      }
+      // Suffix ID: lokasi 1 pakai '', lokasi 2/3/4 pakai angka
+      const sfx = no===1 ? '' : String(no);
+      document.getElementById('cfg-lat'+sfx).value=lat;
+      document.getElementById('cfg-lon'+sfx).value=lon;
+      updatePreviewKoordinat(lat,lon,no);
       toast('📍 Koordinat Lokasi '+no+' berhasil diambil!','ok');
     },
     err=>{toast('❗ GPS gagal: '+(err.code===1?'izin ditolak':err.code===2?'sinyal lemah':'timeout'),'er');},
@@ -1946,13 +2180,14 @@ function ambilKoordinatKantor(no){
 }
 
 function updatePreviewKoordinat(lat,lon,no){
-  const sfx  = no===2?'2':'';
+  const sfx  = no===1 ? '' : String(no);
   const el   = document.getElementById('preview-koordinat'+sfx);
   const txt  = document.getElementById('preview-koordinat-text'+sfx);
   const lnk  = document.getElementById('preview-maps-link'+sfx);
   if(!el||!lat||!lon){if(el)el.style.display='none';return;}
   const cfg = getCfg();
-  const nm  = no===2?(cfg.namaLokasi2||'Lokasi 2'):(cfg.namaLokasi1||'Lokasi 1');
+  const namaList = ['', cfg.namaLokasi1||'Lokasi 1', cfg.namaLokasi2||'Lokasi 2', cfg.namaLokasi3||'Lokasi 3', cfg.namaLokasi4||'Lokasi 4'];
+  const nm  = namaList[no] || 'Lokasi '+no;
   txt.textContent='📍 '+nm+': '+lat+', '+lon;
   lnk.href=`https://www.google.com/maps?q=${lat},${lon}&z=17`;
   el.style.display='block';
@@ -1973,21 +2208,22 @@ function hitungJarak(lat1,lon1,lat2,lon2){
 function cekRadius(){
   const cfg=getCfg();
   if(!lokasiData||lokasiData.acc===0) return {ok:true};
-  const ada1=cfg.latKantor&&cfg.lonKantor;
-  const ada2=cfg.latKantor2&&cfg.lonKantor2;
-  if(!ada1&&!ada2) return {ok:true}; // tidak ada lokasi = bebas
+  const lokasi = [
+    {ada: cfg.latKantor&&cfg.lonKantor,   lat:cfg.latKantor,  lon:cfg.lonKantor,  nm:cfg.namaLokasi1||'Kantor Pusat',   no:1},
+    {ada: cfg.latKantor2&&cfg.lonKantor2, lat:cfg.latKantor2, lon:cfg.lonKantor2, nm:cfg.namaLokasi2||'Kantor Cabang',  no:2},
+    {ada: cfg.latKantor3&&cfg.lonKantor3, lat:cfg.latKantor3, lon:cfg.lonKantor3, nm:cfg.namaLokasi3||'Gudang 3',       no:3},
+    {ada: cfg.latKantor4&&cfg.lonKantor4, lat:cfg.latKantor4, lon:cfg.lonKantor4, nm:cfg.namaLokasi4||'Gudang 4',       no:4}
+  ];
+  const anyAda = lokasi.some(l=>l.ada);
+  if(!anyAda) return {ok:true}; // tidak ada lokasi = bebas
   const lat=parseFloat(lokasiData.lat), lon=parseFloat(lokasiData.lon);
   const radius=cfg.radiusAbsen||200;
   let closest=null, closestName='', closestDist=Infinity;
-  if(ada1){
-    const d=Math.round(hitungJarak(lat,lon,parseFloat(cfg.latKantor),parseFloat(cfg.lonKantor)));
-    if(d<closestDist){closestDist=d;closestName=cfg.namaLokasi1||'Kantor Pusat';closest=1;}
-    if(d<=radius) return {ok:true, jarak:d, lokasi:cfg.namaLokasi1||'Kantor Pusat'};
-  }
-  if(ada2){
-    const d=Math.round(hitungJarak(lat,lon,parseFloat(cfg.latKantor2),parseFloat(cfg.lonKantor2)));
-    if(d<closestDist){closestDist=d;closestName=cfg.namaLokasi2||'Kantor Cabang';closest=2;}
-    if(d<=radius) return {ok:true, jarak:d, lokasi:cfg.namaLokasi2||'Kantor Cabang'};
+  for(const lk of lokasi){
+    if(!lk.ada) continue;
+    const d=Math.round(hitungJarak(lat,lon,parseFloat(lk.lat),parseFloat(lk.lon)));
+    if(d<closestDist){closestDist=d;closestName=lk.nm;closest=lk.no;}
+    if(d<=radius) return {ok:true, jarak:d, lokasi:lk.nm};
   }
   return {ok:false, jarak:closestDist, radius, lokasiTerdekat:closestName, noTerdekat:closest};
 }
