@@ -392,14 +392,22 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
         <div style="font-size:11px;color:#b45309;margin-bottom:10px">Data karyawan tersimpan lokal. Klik tombol di bawah untuk sinkronisasi ke Firebase.</div>
         <button class="btn btn-b" style="margin-bottom:0;padding:10px" onclick="syncKeFirebase()"><i class="ti ti-cloud-upload"></i> Sync Semua Data ke Firebase</button>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div class="sec" style="margin-bottom:0"><i class="ti ti-dashboard"></i> Dashboard Hari Ini</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px">
+        <div class="sec" style="margin-bottom:0"><i class="ti ti-dashboard"></i> Dashboard</div>
         <button onclick="refreshDashboard()" style="background:var(--bl);color:var(--bd);border:1px solid var(--br);border-radius:9px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px">
           <i class="ti ti-refresh" style="font-size:13px"></i> Refresh
         </button>
       </div>
+      <div style="background:var(--bp);border-radius:10px;padding:10px;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:700;color:var(--mt);margin-bottom:6px;text-transform:uppercase">📆 Filter Tanggal</div>
+        <input type="date" id="dash-tgl" onchange="renderAdminDash()" style="width:100%;padding:8px 10px;border:1px solid var(--br);border-radius:8px;font-size:11px;color:var(--tx);background:#fff;outline:none;margin-bottom:8px">
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <button onclick="setDashTgl('today')" style="background:#fff;color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:5px 10px;font-size:10px;font-weight:600;cursor:pointer">📅 Hari Ini</button>
+          <button onclick="setDashTgl('yesterday')" style="background:#fff;color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:5px 10px;font-size:10px;font-weight:600;cursor:pointer">← Kemarin</button>
+        </div>
+      </div>
       <div class="admin-stat" id="admin-stat"></div>
-      <div class="sec"><i class="ti ti-users"></i> Status Karyawan Hari Ini</div>
+      <div class="sec"><i class="ti ti-users"></i> Status Karyawan <span id="dash-tgl-label" style="font-size:11px;color:var(--mt);font-weight:600"></span></div>
       <div id="emp-today"></div>
     </div>
     <div id="ad-karyawan" style="display:none">
@@ -1441,16 +1449,19 @@ async function renderRiwayat(){
     const mapsUrl    = r.lokasi ? `https://www.google.com/maps?q=${r.lokasi.lat},${r.lokasi.lon}&z=17` : '#';
     const lokasiTeks = r.lokasi ? (r.lokasi.kota||r.lokasi.lat+', '+r.lokasi.lon) : 'Unknown';
     const nameTag    = isAdmin() ? `<div style="font-size:10px;color:${r._warna};font-weight:700;margin-bottom:2px">👤 ${r._nama}</div>` : '';
+    const isMasuk    = r.tipe==='masuk';
+    const labelColor = isMasuk ? '#15803d' : '#dc2626';
+    const jamColor   = isMasuk ? '#15803d' : '#dc2626';
     return `<div class="ri">
-      <div class="ri-ic ${r.tipe==='masuk'?'m':'k'}"><i class="ti ti-${r.tipe==='masuk'?'login':'logout'}"></i></div>
+      <div class="ri-ic ${isMasuk?'m':'k'}"><i class="ti ti-${isMasuk?'login':'logout'}"></i></div>
       <div class="ri-tx">
         ${nameTag}
-        <div class="rn">${r.tipe==='masuk'?'Absen Masuk':'Absen Keluar'}${r.terlambat?' <span class="bdg bdg-a">Terlambat</span>':''}${r.durasi?' <span class="bdg bdg-b">'+r.durasi+'</span>':''}</div>
+        <div class="rn" style="color:${labelColor};font-weight:800">${isMasuk?'Absen Masuk':'Absen Keluar'}${r.terlambat?' <span class="bdg bdg-a">Terlambat</span>':''}${r.durasi?' <span class="bdg bdg-b">'+r.durasi+'</span>':''}</div>
         <div class="rd">${r.tgl} · <a href="${mapsUrl}" target="_blank" style="color:#0ea5e9;text-decoration:none">📍 ${lokasiTeks}</a></div>
       </div>
       <div style="display:flex;align-items:center;gap:6px">
         ${r.foto?`<img class="ri-ft" src="${r.foto}" onclick="previewFoto(this.src)" alt="foto">`:''}
-        <div class="ri-jm">${r.jam}</div>
+        <div class="ri-jm" style="color:${jamColor};font-weight:800">${r.jam}</div>
       </div>
     </div>`;
   }).join('');
@@ -1697,6 +1708,20 @@ async function refreshDashboard(){
   toast('✅ Data berhasil diperbarui!','ok');
 }
 
+// Helper preset tanggal untuk Dashboard
+function setDashTgl(p){
+  const fmt = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const now = new Date();
+  let tgl;
+  if(p==='today'){
+    tgl = now;
+  } else if(p==='yesterday'){
+    tgl = new Date(now.getFullYear(), now.getMonth(), now.getDate()-1);
+  }
+  document.getElementById('dash-tgl').value = fmt(tgl);
+  renderAdminDash();
+}
+
 // ── ADMIN DASHBOARD ───────────────────────────────────
 async function renderAdminDash(){
   // Ambil data terbaru dari Firebase
@@ -1706,30 +1731,52 @@ async function renderAdminDash(){
   if(fbUsers)   DB.setLocal('users',   fbUsers);
   if(fbAbsensi) DB.setLocal('absensi', fbAbsensi);
 
-  const today = new Date().toLocaleDateString('id-ID');
+  // Set default tanggal (hari ini) jika belum ada
+  const inTgl = document.getElementById('dash-tgl');
+  if(inTgl && !inTgl.value){
+    const n = new Date();
+    inTgl.value = n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+  }
+
+  // Konversi tanggal dari date input ke format dd/m/yyyy yang dipakai di data absensi
+  const tglPilih = inTgl && inTgl.value ? new Date(inTgl.value+'T00:00:00') : new Date();
+  const tglStr   = tglPilih.toLocaleDateString('id-ID'); // e.g. "18/5/2026"
+  const today    = new Date().toLocaleDateString('id-ID');
+  const isToday  = tglStr === today;
+
+  // Update label tanggal
+  const lblEl = document.getElementById('dash-tgl-label');
+  if(lblEl){
+    const HARI = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+    const labelTgl = isToday
+      ? 'Hari Ini'
+      : HARI[tglPilih.getDay()]+', '+tglPilih.toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+    lblEl.textContent = '· '+labelTgl;
+  }
+
   const krw   = Object.entries(users).filter(([,u])=>u.role!=='admin');
   let hadir=0,terlambat=0,belum=0;
   krw.forEach(([uid])=>{
-    const ab=(absensi[uid]||[]).find(a=>a.tgl===today&&a.tipe==='masuk');
+    const ab=(absensi[uid]||[]).find(a=>a.tgl===tglStr&&a.tipe==='masuk');
     if(ab){if(ab.terlambat)terlambat++;else hadir++;}else belum++;
   });
   document.getElementById('admin-stat').innerHTML=`
     <div class="asc"><div class="asl">Total Karyawan</div><div class="asv" style="color:var(--bd)">${krw.length}</div></div>
     <div class="asc"><div class="asl">Hadir</div><div class="asv" style="color:var(--gr)">${hadir}</div></div>
     <div class="asc"><div class="asl">Terlambat</div><div class="asv" style="color:var(--am)">${terlambat}</div></div>
-    <div class="asc"><div class="asl">Belum Absen</div><div class="asv" style="color:var(--rd)">${belum}</div></div>`;
+    <div class="asc"><div class="asl">${isToday?'Belum Absen':'Tidak Hadir'}</div><div class="asv" style="color:var(--rd)">${belum}</div></div>`;
   document.getElementById('emp-today').innerHTML=krw.length?krw.map(([uid,u])=>{
     const abList=absensi[uid]||[];
-    const ab =abList.find(a=>a.tgl===today&&a.tipe==='masuk');
-    const abK=abList.find(a=>a.tgl===today&&a.tipe==='keluar');
+    const ab =abList.find(a=>a.tgl===tglStr&&a.tipe==='masuk');
+    const abK=abList.find(a=>a.tgl===tglStr&&a.tipe==='keluar');
     const st =ab?(ab.terlambat?'terlambat':'hadir'):'belum';
-    const ini=u.nama.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
     const dur=ab&&ab.durasi?' · '+ab.durasi:'';
+    const stLabel = st==='hadir'?'Hadir':st==='terlambat'?'Terlambat':(isToday?'Belum':'Tidak Hadir');
     return `<div class="emp-item">
       ${avatarHTML(u)}
       <div class="emp-tx"><div class="en">${u.nama}</div>
       <div class="ed">${u.jab}${ab?' · masuk: '+ab.jam:''}${abK?' · keluar: '+abK.jam:''}${dur}</div></div>
-      <span class="bdg ${st==='hadir'?'bdg-g':st==='terlambat'?'bdg-a':'bdg-r'}">${st==='hadir'?'Hadir':st==='terlambat'?'Terlambat':'Belum'}</span>
+      <span class="bdg ${st==='hadir'?'bdg-g':st==='terlambat'?'bdg-a':'bdg-r'}">${stLabel}</span>
     </div>`;
   }).join(''):'<div class="empty"><i class="ti ti-users"></i><p>Belum ada karyawan</p></div>';
   const banner=document.getElementById('sync-banner');
