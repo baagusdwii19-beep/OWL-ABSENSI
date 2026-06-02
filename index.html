@@ -1708,6 +1708,16 @@ async function refreshDashboard(){
   toast('✅ Data berhasil diperbarui!','ok');
 }
 
+// Filter status untuk dashboard (all / hadir / terlambat / belum)
+let dashStatFilter = 'all';
+function filterDashStat(status){
+  dashStatFilter = status;
+  renderAdminDash();
+  // Scroll ke list karyawan
+  const listEl = document.getElementById('emp-today');
+  if(listEl) listEl.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
 // Helper preset tanggal untuk Dashboard
 function setDashTgl(p){
   const fmt = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -1761,24 +1771,55 @@ async function renderAdminDash(){
     if(ab){if(ab.terlambat)terlambat++;else hadir++;}else belum++;
   });
   document.getElementById('admin-stat').innerHTML=`
-    <div class="asc"><div class="asl">Total Karyawan</div><div class="asv" style="color:var(--bd)">${krw.length}</div></div>
-    <div class="asc"><div class="asl">Hadir</div><div class="asv" style="color:var(--gr)">${hadir}</div></div>
-    <div class="asc"><div class="asl">Terlambat</div><div class="asv" style="color:var(--am)">${terlambat}</div></div>
-    <div class="asc"><div class="asl">${isToday?'Belum Absen':'Tidak Hadir'}</div><div class="asv" style="color:var(--rd)">${belum}</div></div>`;
-  document.getElementById('emp-today').innerHTML=krw.length?krw.map(([uid,u])=>{
+    <div class="asc" onclick="filterDashStat('all')" style="cursor:pointer;transition:transform 0.15s;border:2px solid transparent" onmouseover="this.style.borderColor='var(--bd)';this.style.transform='scale(1.02)'" onmouseout="this.style.borderColor='transparent';this.style.transform='scale(1)'"><div class="asl">Total Karyawan</div><div class="asv" style="color:var(--bd)">${krw.length}</div><div style="font-size:9px;color:var(--mt);margin-top:4px">👆 Klik untuk lihat semua</div></div>
+    <div class="asc" onclick="filterDashStat('hadir')" style="cursor:pointer;transition:transform 0.15s;border:2px solid transparent" onmouseover="this.style.borderColor='var(--gr)';this.style.transform='scale(1.02)'" onmouseout="this.style.borderColor='transparent';this.style.transform='scale(1)'"><div class="asl">Hadir</div><div class="asv" style="color:var(--gr)">${hadir}</div><div style="font-size:9px;color:var(--mt);margin-top:4px">👆 Klik untuk detail</div></div>
+    <div class="asc" onclick="filterDashStat('terlambat')" style="cursor:pointer;transition:transform 0.15s;border:2px solid transparent" onmouseover="this.style.borderColor='var(--am)';this.style.transform='scale(1.02)'" onmouseout="this.style.borderColor='transparent';this.style.transform='scale(1)'"><div class="asl">Terlambat</div><div class="asv" style="color:var(--am)">${terlambat}</div><div style="font-size:9px;color:var(--mt);margin-top:4px">👆 Klik untuk detail</div></div>
+    <div class="asc" onclick="filterDashStat('belum')" style="cursor:pointer;transition:transform 0.15s;border:2px solid transparent" onmouseover="this.style.borderColor='var(--rd)';this.style.transform='scale(1.02)'" onmouseout="this.style.borderColor='transparent';this.style.transform='scale(1)'"><div class="asl">${isToday?'Belum Absen':'Tidak Hadir'}</div><div class="asv" style="color:var(--rd)">${belum}</div><div style="font-size:9px;color:var(--mt);margin-top:4px">👆 Klik untuk detail</div></div>`;
+  // Filter karyawan berdasarkan status yang dipilih
+  let krwFiltered = krw;
+  if(dashStatFilter !== 'all'){
+    krwFiltered = krw.filter(([uid])=>{
+      const ab=(absensi[uid]||[]).find(a=>a.tgl===tglStr&&a.tipe==='masuk');
+      if(dashStatFilter==='hadir')     return ab && !ab.terlambat;
+      if(dashStatFilter==='terlambat') return ab && ab.terlambat;
+      if(dashStatFilter==='belum')     return !ab;
+      return true;
+    });
+  }
+
+  // Tampilkan label filter aktif jika bukan 'all'
+  const filterLabels = {
+    'all':       {txt: 'Semua Karyawan',                  color:'var(--bd)', bg:'var(--bl)'},
+    'hadir':     {txt: '✅ Hanya Karyawan Hadir',          color:'var(--gr)', bg:'#dcfce7'},
+    'terlambat': {txt: '⚠️ Hanya Karyawan Terlambat',     color:'var(--am)', bg:'#fef3c7'},
+    'belum':     {txt: (isToday?'❌ Hanya Belum Absen':'❌ Hanya Tidak Hadir'), color:'var(--rd)', bg:'#fee2e2'}
+  };
+  const flt = filterLabels[dashStatFilter];
+  const filterBanner = dashStatFilter !== 'all'
+    ? `<div style="background:${flt.bg};border:1px solid ${flt.color};border-radius:10px;padding:8px 12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div style="font-size:11px;font-weight:700;color:${flt.color}">${flt.txt} (${krwFiltered.length})</div>
+        <button onclick="filterDashStat('all')" style="background:#fff;color:${flt.color};border:1px solid ${flt.color};border-radius:7px;padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer">✕ Reset</button>
+       </div>`
+    : '';
+
+  const emptyMsg = dashStatFilter==='all'
+    ? '<div class="empty"><i class="ti ti-users"></i><p>Belum ada karyawan</p></div>'
+    : `<div class="empty"><i class="ti ti-mood-empty"></i><p>Tidak ada karyawan ${dashStatFilter==='hadir'?'yang hadir':dashStatFilter==='terlambat'?'yang terlambat':(isToday?'yang belum absen':'yang tidak hadir')}</p></div>`;
+
+  document.getElementById('emp-today').innerHTML = filterBanner + (krwFiltered.length?krwFiltered.map(([uid,u])=>{
     const abList=absensi[uid]||[];
     const ab =abList.find(a=>a.tgl===tglStr&&a.tipe==='masuk');
     const abK=abList.find(a=>a.tgl===tglStr&&a.tipe==='keluar');
     const st =ab?(ab.terlambat?'terlambat':'hadir'):'belum';
     const dur=ab&&ab.durasi?' · '+ab.durasi:'';
     const stLabel = st==='hadir'?'Hadir':st==='terlambat'?'Terlambat':(isToday?'Belum':'Tidak Hadir');
-    return `<div class="emp-item">
+    return `<div class="emp-item" onclick="lihatRiwayatKaryawan('${uid}','${u.nama.replace(/'/g,"\\'")}')" style="cursor:pointer">
       ${avatarHTML(u)}
       <div class="emp-tx"><div class="en">${u.nama}</div>
       <div class="ed">${u.jab}${ab?' · masuk: '+ab.jam:''}${abK?' · keluar: '+abK.jam:''}${dur}</div></div>
       <span class="bdg ${st==='hadir'?'bdg-g':st==='terlambat'?'bdg-a':'bdg-r'}">${stLabel}</span>
     </div>`;
-  }).join(''):'<div class="empty"><i class="ti ti-users"></i><p>Belum ada karyawan</p></div>';
+  }).join(''):emptyMsg);
   const banner=document.getElementById('sync-banner');
   if(banner) banner.style.display='none';
 }
