@@ -2075,7 +2075,7 @@ async function lihatRiwayatKaryawan(uid, nama){
           <div class="emp-tx" style="flex:1">
             <div class="en" style="font-size:12px">Absen ${isMasuk?'Masuk':'Keluar'} ${tag}</div>
             <div class="ed" style="font-size:10px">📅 ${r.tgl} · 🕐 ${r.jam}</div>
-            <div class="ed" style="font-size:10px">📍 ${r.lokasi||'-'}</div>
+            <div class="ed" style="font-size:10px">📍 ${typeof r.lokasi==='object' && r.lokasi ? (r.lokasi.kota||r.lokasi.nama||(r.lokasi.lat+', '+r.lokasi.lon)) : (r.lokasi||'-')}</div>
             ${dur}
           </div>
           <div style="display:flex;flex-direction:column;gap:4px">
@@ -2098,24 +2098,56 @@ async function editJamAbsensi(uid, idx){
     if(!r){ toast('❗ Data tidak ditemukan','er'); return; }
 
     const jamLama = r.jam || '00:00';
+    const tglFmt = new Date(r.ms||Date.now()).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
     const jamBaru = prompt(
-      `Edit jam ${r.tipe==='masuk'?'masuk':'keluar'} untuk tanggal ${r.tgl}\n\n` +
-      `Jam saat ini: ${jamLama}\n\nMasukkan jam baru (format HH:MM):`,
+      `Edit jam ${r.tipe==='masuk'?'masuk':'keluar'}\n📅 Tanggal: ${tglFmt}\n\n` +
+      `Jam saat ini: ${jamLama}\n\n` +
+      `Masukkan jam baru (bebas format):\n` +
+      `• 08:30 atau 08.30\n` +
+      `• 8:5 atau 8.5\n` +
+      `• 0830 (4 digit)\n` +
+      `• 8 (jam saja → 08:00)`,
       jamLama
     );
-    if(!jamBaru) return;
+    if(jamBaru===null) return; // user klik Cancel
+    if(jamBaru.trim()===''){ toast('❗ Jam tidak boleh kosong','er'); return; }
 
-    // Validasi format
-    if(!/^([01]\d|2[0-3]):([0-5]\d)$/.test(jamBaru)){
-      toast('❗ Format jam tidak valid! Gunakan HH:MM (contoh: 08:30)','er');
+    // Parser jam fleksibel — terima HH:MM, HH.MM, HHMM, HMM, atau H saja
+    function parseJam(s){
+      s = String(s).trim().replace(/\s+/g, '');
+      let m;
+      // Format dengan : atau . (1-2 digit jam : 1-2 digit menit)
+      m = s.match(/^(\d{1,2})[:.](\d{1,2})$/);
+      if(m) return {h:+m[1], mn:+m[2]};
+      // Format 4 digit tanpa pemisah (0830)
+      m = s.match(/^(\d{2})(\d{2})$/);
+      if(m) return {h:+m[1], mn:+m[2]};
+      // Format 3 digit (830 = 8:30)
+      m = s.match(/^(\d)(\d{2})$/);
+      if(m) return {h:+m[1], mn:+m[2]};
+      // Hanya jam (8 = 08:00)
+      m = s.match(/^(\d{1,2})$/);
+      if(m) return {h:+m[1], mn:0};
+      return null;
+    }
+
+    const p = parseJam(jamBaru);
+    if(!p){
+      toast('❗ Format jam tidak dikenali. Coba: 08:30, 8.30, atau 0830','er');
+      return;
+    }
+    if(p.h<0 || p.h>23 || p.mn<0 || p.mn>59){
+      toast(`❗ Jam ${p.h}:${p.mn} tidak valid (jam 0-23, menit 0-59)`,'er');
       return;
     }
 
-    // Update jam dan timestamp ms
-    const [jH,jM] = jamBaru.split(':').map(Number);
+    // Format jadi HH:MM untuk display & storage
+    const jH = p.h, jM = p.mn;
+    const jamBaruFmt = String(jH).padStart(2,'0')+':'+String(jM).padStart(2,'0');
+
     const dOld = new Date(r.ms||Date.now());
     const dNew = new Date(dOld.getFullYear(), dOld.getMonth(), dOld.getDate(), jH, jM, 0);
-    r.jam = jamBaru;
+    r.jam = jamBaruFmt;
     r.ms  = dNew.getTime();
 
     // Cek apakah terlambat (untuk absen masuk)
