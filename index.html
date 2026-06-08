@@ -734,6 +734,7 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
     <label class="flbl">Jabatan *</label><input type="text" class="fin" id="ef-jab" placeholder="Jabatan / posisi">
     <label class="flbl">Divisi</label><input type="text" class="fin" id="ef-div" placeholder="Contoh: Operasional, IT, HRD">
     <label class="flbl">Username Login *</label><input type="text" class="fin" id="ef-un" placeholder="Username unik (huruf kecil)">
+    <label class="flbl">NIK / ID Karyawan *</label><input type="text" class="fin" id="ef-nik" placeholder="Contoh: 3201012001 atau EMP001">
     <label class="flbl">Password * <span id="ef-pw-hint" style="font-weight:400;color:var(--mt)">(kosongkan jika tidak diubah)</span></label>
     <input type="password" class="fin" id="ef-pw" placeholder="Min 4 karakter">
     <label class="flbl">Foto Profil (Opsional)</label>
@@ -1609,6 +1610,7 @@ async function calcGaji(){
     if(selEmp.options.length<=1){
       const users = await FB.get('users') || getUsers();
       let html = '<option value="">👤 Saya (Admin)</option>';
+      html += '<option value="__ALL__">📋 Semua Karyawan (Excel)</option>';
       Object.entries(users).filter(([,u])=>u.role!=='admin').forEach(([uid,u])=>{
         html += `<option value="${uid}">${u.nama}</option>`;
       });
@@ -1616,6 +1618,23 @@ async function calcGaji(){
     }
   } else if(selEmp){
     selEmp.style.display = 'none';
+  }
+
+  // Jika admin pilih "Semua Karyawan", tampilan jadi mode info (rincian per tanggal tidak relevan)
+  // Hanya tombol Download Excel yang dipakai
+  if(selEmp && selEmp.value === '__ALL__'){
+    document.getElementById('g-total').textContent  = '—';
+    document.getElementById('g-det').textContent    = 'Pilih tanggal & klik Download Excel untuk export semua karyawan';
+    document.getElementById('g-hari').textContent   = '—';
+    document.getElementById('g-jam').textContent    = '—';
+    document.getElementById('g-total2').textContent = '—';
+    const tglListEl = document.getElementById('g-tanggal-list');
+    if(tglListEl) tglListEl.innerHTML = '<div class="empty" style="padding:30px"><i class="ti ti-users" style="font-size:32px;color:var(--bd)"></i><p style="font-size:11px;color:var(--mt);margin-top:8px;line-height:1.6"><b>Mode Export Semua Karyawan</b><br>Atur rentang tanggal di atas,<br>lalu klik <b>Download Excel Rincian</b><br>untuk download laporan semua karyawan<br>dalam satu file Excel.</p></div>';
+    const minggu = document.getElementById('g-minggu');
+    if(minggu) minggu.innerHTML='<div style="text-align:center;padding:20px;color:var(--mt);font-size:11px">📋 Mode export semua karyawan aktif</div>';
+    const resetAdmin = document.getElementById('g-reset-admin');
+    if(resetAdmin) resetAdmin.style.display='none';
+    return; // Skip hitungan lain
   }
 
   // Tentukan target user
@@ -2362,7 +2381,7 @@ function showAddEmp(){
     efFotoData='';
     document.getElementById('emp-form-title').textContent='Tambah Karyawan Baru';
     document.getElementById('ef-pw-hint').style.display='none';
-    ['ef-nama','ef-jab','ef-div','ef-un','ef-pw'].forEach(id=>document.getElementById(id).value='');
+    ['ef-nama','ef-jab','ef-div','ef-un','ef-nik','ef-pw'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('ef-warna').value='#0ea5e9';
     document.getElementById('ef-foto-input').value='';
     document.getElementById('ef-foto-preview').innerHTML='?';
@@ -2382,6 +2401,7 @@ function editEmp(uid){
     document.getElementById('ef-jab').value=u.jab;
     document.getElementById('ef-div').value=u.div||'';
     document.getElementById('ef-un').value=uid;
+    document.getElementById('ef-nik').value=u.id||'';
     document.getElementById('ef-pw').value='';
     document.getElementById('ef-warna').value=u.warna||'#0ea5e9';
     document.getElementById('ef-foto-input').value='';
@@ -2404,10 +2424,12 @@ function saveEmp(){
     const jab   = document.getElementById('ef-jab').value.trim();
     const div   = document.getElementById('ef-div').value.trim();
     const un    = document.getElementById('ef-un').value.trim().toLowerCase().replace(/\s+/g,'');
+    const nik   = document.getElementById('ef-nik').value.trim();
     const pw    = document.getElementById('ef-pw').value;
     const warna = document.getElementById('ef-warna').value;
 
     if(!nama||!jab||!un){toast('❗ Nama, jabatan & username wajib diisi!','er');return;}
+    if(!nik){toast('❗ NIK / ID Karyawan wajib diisi!','er');return;}
     if(!editEmpUid && pw.length<4){toast('❗ Password min 4 karakter!','er');return;}
 
     const btnSimpan = document.querySelector('#mdEmp .mk');
@@ -2438,7 +2460,7 @@ function saveEmp(){
           return;
         }
         const old = users[editEmpUid]||{};
-        const updated = {...old, nama, jab, div, warna};
+        const updated = {...old, nama, jab, div, warna, id:nik};
         if(pw.length>=4) updated.pw = pw;
         // Simpan foto profil (atau hapus jika dikosongkan)
         if(efFotoData) updated.foto = efFotoData;
@@ -2460,9 +2482,15 @@ function saveEmp(){
           if(btnSimpan){btnSimpan.disabled=false; btnSimpan.textContent='Simpan';}
           return;
         }
-        const krwCount = Object.keys(users).filter(k=>users[k]&&users[k].role!=='admin').length;
-        const newId = 'KRY-'+String(krwCount+1).padStart(3,'0');
-        const newUser = {pw, nama, jab, div, id:newId, role:'karyawan', warna};
+        // Cek apakah NIK sudah dipakai karyawan lain
+        const nikDuplicate = Object.entries(users).find(([,u])=>u.id===nik);
+        if(nikDuplicate){
+          statusEl.style.background='#fee2e2'; statusEl.style.color='#dc2626';
+          statusEl.innerHTML='❌ NIK "'+nik+'" sudah dipakai oleh '+nikDuplicate[1].nama;
+          if(btnSimpan){btnSimpan.disabled=false; btnSimpan.textContent='Simpan';}
+          return;
+        }
+        const newUser = {pw, nama, jab, div, id:nik, role:'karyawan', warna};
         if(efFotoData) newUser.foto = efFotoData;
 
         const ok = await FB.set('users/'+un, newUser);
@@ -2856,6 +2884,11 @@ async function exportRincianExcel(){
   const absensi= fbAbsensi || getAllAbsensi();
   const cfg    = fbCfg     || getCfg();
 
+  // ── MODE EXPORT SEMUA KARYAWAN ─────────────────────
+  if(targetUid === '__ALL__'){
+    return exportRincianExcelSemua(users, absensi, cfg, tglMulai, tglAkhir, periodeStr, periodeShort);
+  }
+
   const targetUser = users[targetUid] || {nama:targetUid,jab:'-',div:'-',id:'-'};
   const targetNama = targetUser.nama || targetUid;
 
@@ -2987,6 +3020,159 @@ async function exportRincianExcel(){
   a.click();
   setTimeout(()=>{URL.revokeObjectURL(url); a.remove();}, 100);
   toast('📊 Excel rincian berhasil didownload!','ok');
+}
+
+// ── Export Excel Rincian SEMUA KARYAWAN dalam 1 file ─────
+async function exportRincianExcelSemua(users, absensi, cfg, tglMulai, tglAkhir, periodeStr, periodeShort){
+  const karyawan = Object.entries(users).filter(([,u])=>u.role!=='admin');
+  if(karyawan.length===0){
+    toast('❗ Belum ada karyawan','er');return;
+  }
+
+  const HARI = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+  const fmt = v => v.toLocaleString('id-ID');
+  const tglCetak = new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+
+  // Buat section per karyawan
+  let allSections = '';
+  let grandTotJamAsli = 0, grandTotJamBayar = 0, grandTotGaji = 0;
+  let grandTotHari = 0, grandTotTerlambat = 0;
+  const summaryRows = [];
+
+  karyawan.forEach(([uid,u])=>{
+    const list = (absensi[uid]||[]);
+    const bList = list.filter(r=>r.tipe==='masuk' && r.ms>=tglMulai && r.ms<=tglAkhir);
+    const sorted = [...bList].sort((a,b)=>(a.ms||0)-(b.ms||0));
+
+    let totJamAsli=0, totJamBayar=0, totGaji=0, totHadir=0, totTerlambat=0;
+    const dataRows = sorted.map(r=>{
+      const d = new Date(r.ms);
+      const tgl = d.toLocaleDateString('id-ID',{day:'2-digit',month:'2-digit',year:'numeric'});
+      const hariNm = HARI[d.getDay()];
+      const jamMs = r.durasiMs||0;
+      const jamAsli  = jamMs/3600000;
+      const jamKerja = bulatkanJam(jamAsli);
+      const gajiHari = Math.round(jamKerja*cfg.tarifJam);
+      const keluar = list.find(x=>x.tgl===r.tgl && x.tipe==='keluar');
+      const jamMasukStr = r.jam || '--:--';
+      const jamKeluarStr = keluar ? keluar.jam : '--:--';
+      const status = r.terlambat ? 'Terlambat' : (jamMs>0 ? 'Selesai' : 'Belum Keluar');
+      const manual = r.manual ? ' (Manual)' : '';
+      totJamAsli += jamAsli; totJamBayar += jamKerja;
+      totGaji += gajiHari; totHadir++;
+      if(r.terlambat) totTerlambat++;
+      return {tgl,hariNm,jamMasukStr,jamKeluarStr,jamAsli,jamKerja,status:status+manual,gajiHari};
+    });
+
+    grandTotJamAsli += totJamAsli; grandTotJamBayar += totJamBayar;
+    grandTotGaji += totGaji; grandTotHari += totHadir; grandTotTerlambat += totTerlambat;
+    summaryRows.push({nama:u.nama, nik:u.id||'-', jab:u.jab||'-', hari:totHadir, jamAsli:totJamAsli, jamBayar:totJamBayar, terlambat:totTerlambat, gaji:totGaji});
+
+    // Section per karyawan
+    allSections += `
+    <tr><td colspan="9" style="height:14px;border:none"></td></tr>
+    <tr><td colspan="9" class="empname">👤 ${u.nama} · NIK: ${u.id||'-'} · ${u.jab||'-'}${u.div&&u.div!=='-'?' · '+u.div:''}</td></tr>`;
+
+    if(dataRows.length===0){
+      allSections += `<tr><td colspan="9" class="empty">Tidak ada absensi di periode ini</td></tr>`;
+    } else {
+      allSections += `<tr class="hdr">
+        <th>No</th><th>Tanggal</th><th>Hari</th><th>Jam Masuk</th>
+        <th>Jam Keluar</th><th>Jam Kerja</th><th>Jam Bayar</th><th>Status</th><th>Gaji Harian</th>
+      </tr>`;
+      allSections += dataRows.map((r,i)=>`
+      <tr${i%2===1?' class="alt"':''}>
+        <td class="cn">${i+1}</td>
+        <td class="cn">${r.tgl}</td>
+        <td class="cn">${r.hariNm}</td>
+        <td class="cn">${r.jamMasukStr}</td>
+        <td class="cn">${r.jamKeluarStr}</td>
+        <td class="num">${fmtJam(r.jamAsli)}</td>
+        <td class="num">${fmtJam(r.jamKerja)}</td>
+        <td class="cn ${r.status.includes('Terlambat')?'late':(r.status.includes('Selesai')?'ok':'')}">${r.status}</td>
+        <td class="rp">Rp ${fmt(r.gajiHari)}</td>
+      </tr>`).join('');
+      allSections += `<tr class="subtot">
+        <td colspan="5" style="text-align:right;padding-right:14px">SUBTOTAL ${totHadir} HARI</td>
+        <td class="num">${fmtJam(totJamAsli)}</td>
+        <td class="num">${fmtJam(totJamBayar)}</td>
+        <td class="cn">${totTerlambat} terlambat</td>
+        <td class="rp">Rp ${fmt(totGaji)}</td>
+      </tr>`;
+    }
+  });
+
+  // Summary table (Ringkasan semua karyawan)
+  const summaryTable = `
+  <tr><td colspan="9" class="hdr" style="background:#475569">📊 RINGKASAN SEMUA KARYAWAN</td></tr>
+  <tr class="hdr">
+    <th colspan="2">Nama Karyawan</th><th>NIK</th><th>Jabatan</th>
+    <th>Hari</th><th>Jam Kerja</th><th>Jam Bayar</th><th>Terlambat</th><th>Total Gaji</th>
+  </tr>
+  ${summaryRows.map((r,i)=>`
+  <tr${i%2===1?' class="alt"':''}>
+    <td colspan="2"><b>${r.nama}</b></td>
+    <td class="cn">${r.nik}</td>
+    <td>${r.jab}</td>
+    <td class="cn">${r.hari}</td>
+    <td class="num">${fmtJam(r.jamAsli)}</td>
+    <td class="num">${fmtJam(r.jamBayar)}</td>
+    <td class="cn ${r.terlambat>0?'late':''}">${r.terlambat}</td>
+    <td class="rp">Rp ${fmt(r.gaji)}</td>
+  </tr>`).join('')}
+  <tr class="total">
+    <td colspan="4" style="text-align:right;padding-right:14px">GRAND TOTAL ${karyawan.length} KARYAWAN</td>
+    <td class="cn">${grandTotHari}</td>
+    <td class="num">${fmtJam(grandTotJamAsli)}</td>
+    <td class="num">${fmtJam(grandTotJamBayar)}</td>
+    <td class="cn">${grandTotTerlambat}</td>
+    <td class="rp">Rp ${fmt(grandTotGaji)}</td>
+  </tr>`;
+
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="UTF-8">
+<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
+<x:Name>Rincian Semua Karyawan</x:Name>
+<x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+<style>
+  table{border-collapse:collapse;font-family:Calibri,Arial;font-size:11pt;width:100%}
+  th,td{border:1px solid #94a3b8;padding:7px 10px}
+  .title{font-size:18pt;font-weight:bold;color:#0c4a6e;background:#bae6fd;text-align:center;padding:12px}
+  .sub{font-size:11pt;color:#475569;background:#e0f2fe;text-align:center;padding:6px}
+  .hdr{background:#0ea5e9;color:#fff;font-weight:bold;text-align:center;font-size:11pt}
+  .empname{background:#0c4a6e;color:#fff;font-weight:bold;font-size:12pt;padding:10px}
+  .empty{text-align:center;color:#94a3b8;font-style:italic;padding:10px}
+  .num{text-align:right}
+  .rp{text-align:right;color:#0c4a6e;font-weight:bold}
+  .cn{text-align:center}
+  .subtot{background:#fef3c7;font-weight:bold;color:#92400e}
+  .subtot .rp{color:#15803d}
+  .total{background:#fde68a;font-weight:bold;color:#7c2d12;font-size:12pt}
+  .total .rp{color:#15803d;font-size:13pt}
+  .alt{background:#f1f5f9}
+  .late{color:#dc2626;font-weight:bold}
+  .ok{color:#15803d;font-weight:bold}
+</style>
+</head><body>
+<table>
+  <tr><td colspan="9" class="title">${cfg.perusahaan||'OWL Absensi'} — Rincian Absensi SEMUA Karyawan</td></tr>
+  <tr><td colspan="9" class="sub">📆 Periode: <b>${periodeStr}</b> · Tarif: Rp ${fmt(cfg.tarifJam)}/jam · Dicetak: ${tglCetak}</td></tr>
+  ${summaryTable}
+  ${allSections}
+</table>
+</body></html>`;
+
+  const blob = new Blob(['\uFEFF'+html], {type:'application/vnd.ms-excel'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Rincian_SemuaKaryawan_'+periodeShort+'.xls';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url); a.remove();}, 100);
+  toast('📊 Excel '+karyawan.length+' karyawan berhasil didownload!','ok');
 }
 
 // ── SETTING ───────────────────────────────────────────
