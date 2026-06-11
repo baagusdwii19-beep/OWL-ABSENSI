@@ -48,6 +48,18 @@ const FB = {
       return await xhr('GET', FB_BASE + '/' + path + '.json');
     } catch(e){ console.warn('FB.get error:', path, e.message); return null; }
   },
+  // Versi safe untuk operasi yang akan re-save data (edit/hapus/tambah)
+  // Return {ok, list, error} — ok=false kalau network error (jangan overwrite!)
+  getSafe: async (path) => {
+    try {
+      const data = await xhr('GET', FB_BASE + '/' + path + '.json');
+      // Sukses: data bisa array, object, atau null (genuinely empty)
+      return {ok:true, data: data};
+    } catch(e){
+      console.warn('FB.getSafe error:', path, e.message);
+      return {ok:false, data: null, error: e.message};
+    }
+  },
   set: async (path, data) => {
     try {
       await xhr('PUT', FB_BASE + '/' + path + '.json', data);
@@ -558,9 +570,17 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
 
   <!-- NOTIF -->
   <div class="pg" id="pg-notif">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div class="sec" style="margin-bottom:0"><i class="ti ti-bell"></i> Notifikasi</div>
-      <button onclick="clearNotif()" style="background:var(--bp);color:var(--mt);border:1px solid var(--br);border-radius:9px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Hapus Semua</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div class="sec" style="margin-bottom:0"><i class="ti ti-bell"></i> Notifikasi & Riwayat Aktivitas</div>
+      <button onclick="clearNotif()" style="background:var(--bp);color:var(--mt);border:1px solid var(--br);border-radius:9px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer"><i class="ti ti-trash"></i> Hapus Semua</button>
+    </div>
+    <div id="notif-filter" style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid var(--br);border-radius:10px;padding:8px;margin-bottom:10px;display:none">
+      <div style="font-size:10px;color:var(--mt);font-weight:600;margin-bottom:5px">FILTER:</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button class="nf-btn on" onclick="filterNotif('all',this)" style="background:var(--bd);color:#fff;border:1px solid var(--bd);border-radius:7px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer">📋 Semua</button>
+        <button class="nf-btn" onclick="filterNotif('admin',this)" style="background:#fff;color:#7c3aed;border:1px solid #c4b5fd;border-radius:7px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer">👤 Aksi Admin</button>
+        <button class="nf-btn" onclick="filterNotif('absen',this)" style="background:#fff;color:#15803d;border:1px solid #86efac;border-radius:7px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer">📸 Absensi</button>
+      </div>
     </div>
     <div id="notif-list"></div>
   </div>
@@ -2210,17 +2230,95 @@ async function calcGaji(){
 // ── NOTIF ─────────────────────────────────────────────
 function pushNotif(cat,tipe,msg){
   const n=new Date(),list=getNotifs();
-  list.unshift({cat,tipe,msg,waktu:n.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}),tgl:n.toLocaleDateString('id-ID')});
-  DB.setLocal('notifs',list.slice(0,50));
+  const entry = {
+    cat, tipe, msg,
+    waktu: n.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}),
+    tgl:   n.toLocaleDateString('id-ID'),
+    ms:    n.getTime(),
+    by:    (curUser && curUser.nama) ? curUser.nama : 'Sistem',
+    role:  (curUser && curUser.role) || 'sistem'
+  };
+  list.unshift(entry);
+  const trimmed = list.slice(0,200); // simpan max 200 entries
+  DB.setLocal('notifs', trimmed);
   document.getElementById('ndot').style.display='';
+  // Sync ke Firebase async — supaya admin di device lain juga lihat
+  FB.set('notifs', trimmed).catch(()=>{ /* offline OK, akan ke-sync nanti */ });
 }
 function renderNotif(){
-  const catIc={warn:'alert-triangle',ok:'check',info:'info-circle'};
-  const list=getNotifs(),el=document.getElementById('notif-list');
-  if(!list.length){el.innerHTML='<div class="empty"><i class="ti ti-bell-off"></i><p>Tidak ada notifikasi</p></div>';return;}
-  el.innerHTML=list.map(n=>`<div class="noti"><div class="noti-ic ${n.cat}"><i class="ti ti-${catIc[n.cat]||'bell'}"></i></div><div class="noti-tx"><div class="nt">${n.tipe}</div><div class="nd">${n.msg}</div><div class="ntime">🕐 ${n.tgl} · ${n.waktu}</div></div></div>`).join('');
+  const catIc = {warn:'alert-triangle',ok:'check',info:'info-circle',admin:'shield-check',sukses:'check',error:'x'};
+  const catColor = {
+    warn:   '#b45309',
+    ok:     '#15803d',
+    info:   '#0369a1',
+    admin:  '#7c3aed',    // ungu untuk aksi admin
+    sukses: '#15803d',
+    error:  '#dc2626'
+  };
+  // Tampilkan filter hanya untuk admin
+  const filterEl = document.getElementById('notif-filter');
+  if(filterEl) filterEl.style.display = (curUser && curUser.role === 'admin') ? 'block' : 'none';
+
+  // Ambil dari Firebase dulu kalau ada, fallback localStorage
+  FB.get('notifs').then(fbNotifs=>{
+    if(Array.isArray(fbNotifs)) DB.setLocal('notifs', fbNotifs);
+    doRenderNotif();
+  }).catch(()=>doRenderNotif());
+
+  function doRenderNotif(){
+    let list = getNotifs();
+    // Apply filter
+    if(notifFilterMode === 'admin'){
+      list = list.filter(n => n.cat === 'admin');
+    } else if(notifFilterMode === 'absen'){
+      list = list.filter(n => n.cat !== 'admin' && (n.tipe||'').toLowerCase().match(/absen|terlambat|keluar/i));
+    }
+    const el = document.getElementById('notif-list');
+    if(!el) return;
+    if(!list.length){
+      el.innerHTML='<div class="empty"><i class="ti ti-bell-off"></i><p>Tidak ada notifikasi</p></div>';
+      return;
+    }
+    el.innerHTML = list.map(n=>{
+      const ic = catIc[n.cat] || 'bell';
+      const color = catColor[n.cat] || '#475569';
+      const byBadge = (n.by && n.role==='admin') ? `<span style="background:#ede9fe;color:#7c3aed;padding:2px 6px;border-radius:6px;font-size:9px;font-weight:700;margin-left:6px">👤 ${n.by}</span>` : '';
+      return `<div class="noti">
+        <div class="noti-ic" style="background:${color}1a;color:${color}"><i class="ti ti-${ic}"></i></div>
+        <div class="noti-tx">
+          <div class="nt">${n.tipe}${byBadge}</div>
+          <div class="nd">${n.msg}</div>
+          <div class="ntime">🕐 ${n.tgl} · ${n.waktu}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
 }
-function clearNotif(){DB.setLocal('notifs',[]);renderNotif();toast('Notifikasi dihapus');}
+
+let notifFilterMode = 'all';
+function filterNotif(mode, btn){
+  notifFilterMode = mode;
+  document.querySelectorAll('.nf-btn').forEach(b=>{
+    if(b === btn){
+      b.style.background = mode==='admin' ? '#7c3aed' : (mode==='absen' ? '#15803d' : 'var(--bd)');
+      b.style.color = '#fff';
+      b.style.borderColor = mode==='admin' ? '#7c3aed' : (mode==='absen' ? '#15803d' : 'var(--bd)');
+    } else {
+      b.style.background = '#fff';
+      const dp = b.getAttribute('onclick').match(/'(\w+)'/)[1];
+      b.style.color = dp==='admin' ? '#7c3aed' : (dp==='absen' ? '#15803d' : 'var(--bd)');
+      b.style.borderColor = dp==='admin' ? '#c4b5fd' : (dp==='absen' ? '#86efac' : 'var(--br)');
+    }
+  });
+  renderNotif();
+}
+function clearNotif(){
+  if(!confirm('Hapus semua notifikasi/riwayat admin?\nIni TIDAK BISA di-undo.')) return;
+  DB.setLocal('notifs',[]);
+  FB.del('notifs').catch(()=>{});
+  renderNotif();
+  toast('🗑 Riwayat dihapus');
+}
 
 // ── ADMIN HELPERS ─────────────────────────────────────
 const isAdmin=()=>curUser&&curUser.role==='admin';
@@ -2642,7 +2740,13 @@ function renderEmpList(){
 async function lihatRiwayatKaryawan(uid, nama){
   guardAdmin(async ()=>{
     toast('⏳ Memuat riwayat...','');
-    const list = await FB.get('absensi/'+uid) || [];
+    const safeRes = await FB.getSafe('absensi/'+uid);
+    if(!safeRes.ok){
+      toast('❌ Gagal load riwayat dari server (cek internet)','er');
+      alert('⚠️ Tidak bisa konek ke Firebase\n\nError: '+safeRes.error+'\n\nRiwayat tidak ditampilkan karena bisa salah. Coba lagi setelah internet stabil.');
+      return;
+    }
+    const list = Array.isArray(safeRes.data) ? safeRes.data : [];
 
     // Buat modal jika belum ada
     let md = document.getElementById('mdRiwayatKry');
@@ -2719,7 +2823,13 @@ async function lihatRiwayatKaryawan(uid, nama){
 // Edit jam absensi karyawan
 async function editJamAbsensi(uid, idx){
   guardAdmin(async ()=>{
-    const list = await FB.get('absensi/'+uid) || [];
+    const safeRes = await FB.getSafe('absensi/'+uid);
+    if(!safeRes.ok){
+      toast('❌ KONEKSI GAGAL — operasi dibatalkan untuk keamanan','er');
+      alert('⚠️ Tidak bisa konek ke Firebase\n\nError: '+safeRes.error+'\n\nEdit DIBATALKAN supaya data tidak hilang.\nCoba lagi setelah internet stabil.');
+      return;
+    }
+    const list = Array.isArray(safeRes.data) ? safeRes.data : [];
     const r = list[idx];
     if(!r){ toast('❗ Data tidak ditemukan','er'); return; }
 
@@ -2815,8 +2925,10 @@ async function editJamAbsensi(uid, idx){
     if(ok){
       DB.setLocal('absensi', {...getAllAbsensi(), [uid]: list});
       toast('✅ Jam absensi berhasil diubah!','ok');
-      // Refresh modal riwayat
+      // Cari nama karyawan
       const u = (await FB.get('users/'+uid)) || getUsers()[uid];
+      const nmKry = u?.nama || uid;
+      pushNotif('admin','Edit Jam Absen',`✏️ Jam ${r.tipe} <b>${nmKry}</b> tanggal ${r.tgl} diubah: ${jamLama} → <b>${jamBaruFmt}</b>`);
       if(u) lihatRiwayatKaryawan(uid, u.nama);
       renderAdminDash();
     } else {
@@ -2828,7 +2940,13 @@ async function editJamAbsensi(uid, idx){
 // Hapus absensi
 async function hapusAbsensi(uid, idx, nama){
   guardAdmin(async ()=>{
-    const list = await FB.get('absensi/'+uid) || [];
+    const safeRes = await FB.getSafe('absensi/'+uid);
+    if(!safeRes.ok){
+      toast('❌ KONEKSI GAGAL — operasi dibatalkan untuk keamanan','er');
+      alert('⚠️ Tidak bisa konek ke Firebase\n\nError: '+safeRes.error+'\n\nHapus DIBATALKAN supaya data tidak hilang.\nCoba lagi setelah internet stabil.');
+      return;
+    }
+    const list = Array.isArray(safeRes.data) ? safeRes.data : [];
     const r = list[idx];
     if(!r){ toast('❗ Data tidak ditemukan','er'); return; }
 
@@ -2840,6 +2958,7 @@ async function hapusAbsensi(uid, idx, nama){
     if(ok){
       DB.setLocal('absensi', {...getAllAbsensi(), [uid]: list});
       toast('🗑️ Absensi dihapus','ok');
+      pushNotif('admin','Hapus Absensi',`🗑 Absensi ${r.tipe} <b>${nama}</b> tanggal ${r.tgl} jam ${r.jam} dihapus`);
       lihatRiwayatKaryawan(uid, nama);
       renderAdminDash();
     } else {
@@ -2895,8 +3014,17 @@ async function tambahAbsensiManual(uid, nama){
       newRec.terlambat = (jH*60+jM) > (mH*60+mM);
     }
 
-    // Ambil list yang ada
-    const list = await FB.get('absensi/'+uid) || [];
+    // Ambil list yang ada (PAKAI getSafe supaya kalau network error TIDAK overwrite data lama!)
+    const safeRes = await FB.getSafe('absensi/'+uid);
+    if(!safeRes.ok){
+      toast('❌ KONEKSI GAGAL! Cek internet & coba lagi (data tidak diubah untuk keamanan)','er');
+      alert('⚠️ TIDAK BISA KONEK KE FIREBASE\n\n'+
+            'Error: '+safeRes.error+'\n\n'+
+            'Operasi DIBATALKAN untuk mencegah data lama hilang.\n'+
+            'Coba lagi setelah internet stabil.');
+      return;
+    }
+    const list = Array.isArray(safeRes.data) ? safeRes.data : [];
 
     // Cek duplikat (tipe & tanggal sama)
     if(list.some(r=>r.tgl===newRec.tgl && r.tipe===newRec.tipe)){
@@ -2930,6 +3058,7 @@ async function tambahAbsensiManual(uid, nama){
     if(ok){
       DB.setLocal('absensi', {...getAllAbsensi(), [uid]: list});
       toast('✅ Absensi manual berhasil ditambahkan!','ok');
+      pushNotif('admin','Tambah Absensi Manual',`📝 Absensi manual <b>${nama}</b> tanggal ${tglPilih} (${jamMasuk} → ${jamKeluar}) ditambahkan`);
       lihatRiwayatKaryawan(uid, nama);
       renderAdminDash();
     } else {
@@ -3109,6 +3238,13 @@ function saveEmp(){
       statusEl.innerHTML='✅ Berhasil disimpan ke Firebase!';
       DB.setLocal('users', users);
 
+      // Log aksi admin
+      if(editEmpUid){
+        pushNotif('admin','Edit Karyawan',`📝 Data karyawan <b>${nama}</b> (NIK ${nik}) diperbarui`);
+      } else {
+        pushNotif('admin','Tambah Karyawan',`➕ Karyawan baru <b>${nama}</b> (NIK ${nik}) ditambahkan ke sistem`);
+      }
+
       setTimeout(()=>{
         closeMd('mdEmp');
         if(statusEl) statusEl.remove();
@@ -3136,6 +3272,7 @@ function hapusEmp(uid,nama){
     const users=getUsers(); delete users[uid]; DB.setLocal('users',users);
     const ab=getAllAbsensi(); delete ab[uid]; DB.setLocal('absensi',ab);
     renderEmpList(); renderAdminDash(); populateLapFilter();
+    pushNotif('admin','Hapus Karyawan',`🗑️ Karyawan <b>${nama}</b> dihapus dari sistem beserta seluruh data absensinya`);
     toast('🗑️ Karyawan dihapus','ok');
   });
 }
@@ -3965,6 +4102,10 @@ function saveSetting(){
     if(lat4&&lon4) updatePreviewKoordinat(cfg.latKantor4,cfg.lonKantor4,4);
     updateInfoIstirahat(); updatePreviewGaji();
     toast('✅ Pengaturan berhasil disimpan!','ok');
+    // Log perubahan setting penting
+    const detail = `Tarif: Rp ${cfg.tarifJam.toLocaleString('id-ID')}/jam · Jam Kerja: ${cfg.jamMasuk}–${cfg.jamKeluar}` +
+                   (cfg.gajiRulesOn ? ` · Aturan Custom: AKTIF (${(cfg.gajiRules||[]).length} aturan)` : '');
+    pushNotif('admin','Update Setting',`⚙️ Pengaturan sistem diperbarui: ${detail}`);
   });
 }
 
