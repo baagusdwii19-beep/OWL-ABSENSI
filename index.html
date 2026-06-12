@@ -448,11 +448,45 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
       </div>
       <div style="text-align:right"><div style="font-size:10px;color:var(--mt)">Status</div><span class="bdg bdg-g">Aktif</span></div>
     </div>
+
+    <!-- STATUS PANEL: kesiapan untuk absen (GPS, Camera, Internet) -->
+    <div id="absenStatusPanel" style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid var(--br);border-radius:12px;padding:10px;margin:6px 0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:11px;font-weight:700;color:var(--bd)"><i class="ti ti-shield-check"></i> Status Kesiapan Absen</div>
+        <button onclick="checkAbsenStatus()" style="background:#fff;color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:4px 8px;font-size:10px;font-weight:600;cursor:pointer"><i class="ti ti-refresh" style="font-size:10px"></i> Cek</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+        <div id="st-gps" class="ab-st" style="background:#fff;border-radius:8px;padding:7px;text-align:center">
+          <div style="font-size:18px" id="st-gps-ic">📡</div>
+          <div style="font-size:9px;color:var(--mt);font-weight:600;margin-top:2px">GPS</div>
+          <div style="font-size:9px;font-weight:700" id="st-gps-tx">Cek...</div>
+        </div>
+        <div id="st-cam" class="ab-st" style="background:#fff;border-radius:8px;padding:7px;text-align:center">
+          <div style="font-size:18px" id="st-cam-ic">📷</div>
+          <div style="font-size:9px;color:var(--mt);font-weight:600;margin-top:2px">Kamera</div>
+          <div style="font-size:9px;font-weight:700" id="st-cam-tx">Cek...</div>
+        </div>
+        <div id="st-net" class="ab-st" style="background:#fff;border-radius:8px;padding:7px;text-align:center">
+          <div style="font-size:18px" id="st-net-ic">🌐</div>
+          <div style="font-size:9px;color:var(--mt);font-weight:600;margin-top:2px">Internet</div>
+          <div style="font-size:9px;font-weight:700" id="st-net-tx">Cek...</div>
+        </div>
+      </div>
+    </div>
+
     <div class="st-row">
       <div class="st-box"><div class="sl">⬆️ Masuk</div><div class="sv" id="s-masuk" style="color:var(--gr)">--:--</div></div>
       <div class="st-box"><div class="sl">⬇️ Keluar</div><div class="sv" id="s-keluar" style="color:var(--rd)">--:--</div></div>
       <div class="st-box"><div class="sl">⏱ Durasi</div><div class="sv" id="s-dur" style="font-size:12px">0j 0m</div></div>
     </div>
+
+    <!-- Mode indicator -->
+    <div id="absenModeInfo" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);border:2px solid #15803d;border-radius:14px;padding:12px;text-align:center;margin:6px 0">
+      <div style="font-size:10px;color:#15803d;font-weight:600;margin-bottom:4px">📸 MODE OTOMATIS</div>
+      <div id="absenModeText" style="font-size:15px;font-weight:800;color:#166534">Ambil foto = Absen Masuk</div>
+      <div id="absenModeHint" style="font-size:10px;color:#15803d;margin-top:4px;line-height:1.4">Foto saja — sistem otomatis catat absen masuk</div>
+    </div>
+
     <div class="cam-box" id="camBox" onclick="startCam()">
       <video id="vid" autoplay playsinline muted></video>
       <canvas id="cvs"></canvas>
@@ -463,8 +497,10 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
         <div style="width:44px"></div>
       </div>
     </div>
+
     <!-- Input file galeri (hidden) -->
     <input type="file" id="foto-upload" accept="image/*" capture="user" style="display:none" onchange="handleFotoUpload(event)">
+
     <div class="loc-row" id="loc-row">
       <i class="ti ti-map-pin" style="color:var(--bd);font-size:22px;flex-shrink:0"></i>
       <div class="loc-txt" style="flex:1;min-width:0">
@@ -477,13 +513,18 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
         <button class="loc-btn" id="btn-maps" onclick="bukaMaps()" style="display:none;background:#dcfce7;color:#15803d"><i class="ti ti-map" style="font-size:11px"></i> Maps</button>
       </div>
     </div>
-    <!-- Mode indicator: tampil otomatis sebelum foto -->
-    <div id="absenModeInfo" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);border:2px solid #15803d;border-radius:14px;padding:14px;text-align:center;margin-bottom:8px">
-      <div style="font-size:11px;color:#15803d;font-weight:600;margin-bottom:4px">📸 MODE OTOMATIS</div>
-      <div id="absenModeText" style="font-size:16px;font-weight:800;color:#166534">Ambil foto = Absen Masuk</div>
-      <div id="absenModeHint" style="font-size:10px;color:#15803d;margin-top:4px;line-height:1.5">Cukup foto saja — sistem otomatis catat absen masuk</div>
+
+    <!-- TOMBOL MANUAL FALLBACK — kalau auto absen via foto bermasalah -->
+    <div style="background:#fef3c7;border:1px dashed #d97706;border-radius:11px;padding:9px;margin-top:6px">
+      <div style="font-size:10px;font-weight:700;color:#7c2d12;margin-bottom:6px;text-align:center"><i class="ti ti-tool"></i> Absen Manual (kalau kamera/GPS bermasalah)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <button onclick="absenManualCepat('masuk')" style="background:linear-gradient(90deg,#15803d,#16a34a);color:#fff;border:none;border-radius:8px;padding:8px;font-size:11px;font-weight:700;cursor:pointer"><i class="ti ti-login"></i> Masuk Cepat</button>
+        <button onclick="absenManualCepat('keluar')" style="background:linear-gradient(90deg,#dc2626,#ef4444);color:#fff;border:none;border-radius:8px;padding:8px;font-size:11px;font-weight:700;cursor:pointer"><i class="ti ti-logout"></i> Keluar Cepat</button>
+      </div>
+      <div style="font-size:9px;color:#7c2d12;margin-top:5px;text-align:center;line-height:1.4">Tanpa foto · Pakai lokasi terakhir / "Tidak Diketahui"</div>
     </div>
-    <div style="text-align:center;font-size:10px;color:var(--mt);padding-top:2px"><i class="ti ti-shield-check" style="font-size:12px;vertical-align:-2px"></i> Data tersimpan permanen di HP ini · Tarif Rp <span id="info-tarif">12.500</span>/jam</div>
+
+    <div style="text-align:center;font-size:10px;color:var(--mt);padding-top:4px"><i class="ti ti-shield-check" style="font-size:12px;vertical-align:-2px"></i> Data aman di server · Tarif Rp <span id="info-tarif">12.500</span>/jam</div>
   </div>
 
   <!-- RIWAYAT -->
@@ -1415,6 +1456,8 @@ function gp(id,btn){
   try {
     if(id==='absen' && typeof updateAbsenModeUI==='function'){
       updateAbsenModeUI();
+      // Cek status kesiapan absen (GPS, Camera, Internet)
+      if(typeof checkAbsenStatus==='function') checkAbsenStatus();
       // Auto-deteksi GPS kalau belum ada (membantu absen jadi 1-step)
       if(!lokasiData){ setTimeout(()=>{ try{ getLoc(); }catch(e){console.error(e);} }, 200); }
     }
@@ -1579,6 +1622,97 @@ function getAbsenMode(){
   if(!masuk) return 'masuk';      // belum absen masuk hari ini
   if(!keluar) return 'keluar';    // sudah masuk, belum keluar
   return 'selesai';               // sudah keduanya
+}
+
+// ── CEK STATUS KESIAPAN ABSEN ──────────────────────────
+// Update panel status: GPS, Camera, Internet
+async function checkAbsenStatus(){
+  // GPS Status
+  const gpsIc = document.getElementById('st-gps-ic');
+  const gpsTx = document.getElementById('st-gps-tx');
+  const gpsBox = document.getElementById('st-gps');
+  if(!navigator.geolocation){
+    gpsIc.textContent='❌'; gpsTx.textContent='Tidak didukung'; gpsTx.style.color='#dc2626';
+    gpsBox.style.background='#fee2e2';
+  } else if(lokasiData){
+    gpsIc.textContent='✅'; gpsTx.textContent='Terdeteksi'; gpsTx.style.color='#15803d';
+    gpsBox.style.background='#dcfce7';
+  } else {
+    gpsIc.textContent='⏳'; gpsTx.textContent='Belum deteksi'; gpsTx.style.color='#ca8a04';
+    gpsBox.style.background='#fef3c7';
+  }
+
+  // Camera Status
+  const camIc = document.getElementById('st-cam-ic');
+  const camTx = document.getElementById('st-cam-tx');
+  const camBox = document.getElementById('st-cam');
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    camIc.textContent='❌'; camTx.textContent='Tidak didukung'; camTx.style.color='#dc2626';
+    camBox.style.background='#fee2e2';
+  } else if(fotoData){
+    camIc.textContent='✅'; camTx.textContent='Foto siap'; camTx.style.color='#15803d';
+    camBox.style.background='#dcfce7';
+  } else if(camStream){
+    camIc.textContent='🎥'; camTx.textContent='Kamera aktif'; camTx.style.color='#0369a1';
+    camBox.style.background='#dbeafe';
+  } else {
+    camIc.textContent='📷'; camTx.textContent='Belum aktif'; camTx.style.color='#ca8a04';
+    camBox.style.background='#fef3c7';
+  }
+
+  // Internet Status — coba ping Firebase
+  const netIc = document.getElementById('st-net-ic');
+  const netTx = document.getElementById('st-net-tx');
+  const netBox = document.getElementById('st-net');
+  netIc.textContent='⏳'; netTx.textContent='Cek...'; netTx.style.color='#ca8a04';
+  netBox.style.background='#fef3c7';
+  try {
+    const ok = await Promise.race([
+      FB.test(),
+      new Promise(r=>setTimeout(()=>r(false),5000))
+    ]);
+    if(ok){
+      netIc.textContent='✅'; netTx.textContent='Terhubung'; netTx.style.color='#15803d';
+      netBox.style.background='#dcfce7';
+    } else {
+      netIc.textContent='⚠️'; netTx.textContent='Lambat/Offline'; netTx.style.color='#dc2626';
+      netBox.style.background='#fee2e2';
+    }
+  } catch(e){
+    netIc.textContent='❌'; netTx.textContent='Offline'; netTx.style.color='#dc2626';
+    netBox.style.background='#fee2e2';
+  }
+}
+
+// ── ABSEN MANUAL CEPAT — fallback kalau kamera/GPS bermasalah ──
+async function absenManualCepat(tipe){
+  // Cek apakah sudah ada absen tipe sama hari ini
+  const today = new Date().toLocaleDateString('id-ID');
+  const list = getUserAbs(curUser.username);
+  const sudahAda = list.find(a => a.tipe===tipe && a.tgl===today);
+  if(sudahAda){
+    toast('❗ Anda sudah absen '+tipe+' hari ini ('+sudahAda.jam+')','er');
+    return;
+  }
+
+  // Untuk absen keluar, pastikan sudah absen masuk
+  if(tipe==='keluar'){
+    const masukHariIni = list.find(a => a.tipe==='masuk' && a.tgl===today);
+    if(!masukHariIni){
+      toast('❗ Anda belum absen masuk hari ini! Klik "Masuk Cepat" dulu.','er');
+      return;
+    }
+  }
+
+  const tipeLabel = tipe==='masuk' ? 'MASUK' : 'KELUAR';
+  if(!confirm(`Absen ${tipeLabel} sekarang?\n\n📅 Tanggal: ${today}\n🕐 Jam: ${new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})}\n📷 Tanpa foto\n📍 ${lokasiData ? 'Lokasi: '+(lokasiData.kota||'GPS terdeteksi') : 'Tanpa lokasi'}\n\nLanjutkan?`)) return;
+
+  // Set data sementara supaya doAbsen() bisa pakai
+  fotoData = null; // tanpa foto
+  if(!lokasiData) lokasiData = {lat:'0', lon:'0', kota:'Tidak Diketahui (Manual)'};
+
+  // Panggil doAbsen langsung
+  await doAbsen(tipe);
 }
 
 // Update tampilan badge absen mode (panggil setiap kali balik ke tab absen)
@@ -1765,10 +1899,22 @@ function inputLokasiManual(){
 
 // ── ABSEN ─────────────────────────────────────────────
 function doAbsen(tipe){
-  if(!fotoData){toast('❗ Ambil foto selfie dahulu!','er');return;}
-  if(!lokasiData){toast('❗ Deteksi lokasi GPS dahulu!','er');return;}
+  // Foto sekarang opsional — kalau tidak ada, tetap bisa absen (dengan warning)
+  if(!fotoData){
+    // Tanpa foto — boleh, tapi cek apakah user sudah konfirmasi via absenManualCepat
+    // Kalau dipanggil dari snap() yang gagal, set fotoData ke placeholder transparent
+    fotoData = ''; // string kosong = tanpa foto
+  }
+  if(!lokasiData){
+    if(!confirm('⚠️ Lokasi GPS belum terdeteksi. Tetap lanjut absen tanpa lokasi?\n\n(Admin akan lihat "Lokasi tidak diketahui" di riwayat)')){
+      toast('Klik "Deteksi" untuk GPS, atau pakai "Masuk Cepat" untuk absen tanpa GPS','warn');
+      return;
+    }
+    lokasiData = {lat:'0', lon:'0', kota:'Tidak Diketahui'};
+  }
 
-  // ── CEK RADIUS ──
+  // ── CEK RADIUS — hanya kalau lokasi BENERAN terdeteksi GPS ──
+  if(lokasiData.lat !== '0' && lokasiData.kota !== 'Tidak Diketahui'){
   const cek=cekRadius();
   if(!cek.ok){
     const cfg=getCfg();
@@ -1796,6 +1942,7 @@ function doAbsen(tipe){
     openMd('mdAbsen');
     return;
   }
+  } // close if(lokasiData GPS valid)
 
   // Reset tombol modal ke normal
   document.querySelector('#mdAbsen .mk').textContent='✓ Konfirmasi';
@@ -1806,13 +1953,18 @@ function doAbsen(tipe){
   const n=new Date();
   const cfg=getCfg();
   document.getElementById('md-title').textContent=tipe==='masuk'?'✅ Konfirmasi Absen Masuk':'🚪 Konfirmasi Absen Keluar';
-  document.getElementById('md-ft').src=fotoData;
-  const mapsUrl=`https://www.google.com/maps?q=${lokasiData.lat},${lokasiData.lon}&z=17`;
-  // Info lokasi kantor terdekat yang lolos
-  let lokasiKantorInfo='';
-  if(cek.lokasi){
-    lokasiKantorInfo=`<br><strong>Lokasi kantor:</strong> <span style="color:#15803d">✓ ${cek.lokasi} (${cek.jarak} m)</span>`;
+  // Tampilkan foto kalau ada, atau placeholder kalau tidak
+  const mdFt = document.getElementById('md-ft');
+  if(fotoData){
+    mdFt.src = fotoData;
+    mdFt.style.display = '';
+  } else {
+    mdFt.style.display = 'none';
   }
+  const lokasiKantorInfo = lokasiData.kota === 'Tidak Diketahui' 
+    ? '<br><strong>Lokasi:</strong> <span style="color:#ca8a04">⚠️ Tidak terdeteksi GPS</span>'
+    : '';
+  const mapsUrl = (lokasiData.lat !== '0') ? `https://www.google.com/maps?q=${lokasiData.lat},${lokasiData.lon}&z=17` : '#';
   // Info istirahat
   const iInfo=cfg.istirahatMulai?`<br><span style="font-size:10px;color:var(--am)">⏸ Istirahat ${cfg.istirahatMulai}–${cfg.istirahatSelesai} tidak dihitung</span>`:'';
   document.getElementById('md-info').innerHTML=
@@ -1827,23 +1979,48 @@ function doAbsen(tipe){
 function openMd(id){document.getElementById(id).classList.add('on');}
 function closeMd(id){document.getElementById(id).classList.remove('on');}
 
-function konfirmasi(){
+async function konfirmasi(){
   closeMd('mdAbsen');
   const n=new Date(),j=n.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
   const today=n.toLocaleDateString('id-ID');
   const cfg=getCfg();
-  let list=getUserAbs(curUser.username);
+
+  toast('⏳ Menyimpan absen...','');
+
+  // PENTING: Ambil list TERBARU dari Firebase dulu — kalau gagal, JANGAN overwrite
+  const safeRes = await FB.getSafe('absensi/'+curUser.username);
+  if(!safeRes.ok){
+    toast('❌ KONEKSI GAGAL — absen tidak tersimpan, coba lagi','er');
+    alert('⚠️ Tidak bisa konek ke Firebase\n\nError: '+safeRes.error+'\n\nAbsen DIBATALKAN supaya data riwayat Anda tidak hilang.\nCoba lagi setelah internet stabil.');
+    return;
+  }
+  // Gabungkan list dari Firebase (latest) + entry baru
+  let list = Array.isArray(safeRes.data) ? safeRes.data : [];
 
   if(absenPending==='masuk'){
+    // Cek apakah sudah ada absen masuk hari ini di Firebase
+    const sudahMasuk = list.find(a=>a.tipe==='masuk' && a.tgl===today);
+    if(sudahMasuk){
+      toast('❗ Anda sudah absen masuk hari ini ('+sudahMasuk.jam+')','er');
+      return;
+    }
+
     const [jH,jM]=cfg.jamMasuk.split(':').map(Number);
     const terlambat=n.getHours()>jH||(n.getHours()===jH&&n.getMinutes()>jM);
-    const rec={tipe:'masuk',jam:j,tgl:today,lokasi:{...lokasiData},foto:fotoData,ms:n.getTime(),terlambat,durasiMs:0,durasi:''};
+    const rec={
+      tipe:'masuk', jam:j, tgl:today,
+      lokasi:{...lokasiData}, foto:fotoData||'',
+      ms:n.getTime(), terlambat, durasiMs:0, durasi:''
+    };
     list.unshift(rec);
-    saveUserAbs(curUser.username,list);
+    const ok = await FB.set('absensi/'+curUser.username, list);
+    if(!ok){
+      toast('❌ Gagal save ke server — coba lagi','er');
+      return;
+    }
+    DB.setLocal('absensi', {...getAllAbsensi(), [curUser.username]: list});
     sessMasukMs=n.getTime();
     document.getElementById('s-masuk').textContent=j;
-    document.getElementById('btnM').disabled=true;
-    document.getElementById('btnK').disabled=false;
     if(terlambat){
       pushNotif('warn','Keterlambatan',curUser.nama+' absen masuk '+j+' — terlambat!');
       toast('⚠️ Absen Masuk tercatat (terlambat)','warn');
@@ -1852,28 +2029,23 @@ function konfirmasi(){
       toast('🎉 Absen Masuk berhasil!','ok');
     }
   } else {
+    // Cek apakah sudah ada absen keluar hari ini
+    const sudahKeluar = list.find(a=>a.tipe==='keluar' && a.tgl===today);
+    if(sudahKeluar){
+      toast('❗ Anda sudah absen keluar hari ini ('+sudahKeluar.jam+')','er');
+      return;
+    }
+
     const km=n.getTime();
     let durEfektifMs=0, durTotalMs=0, dur='0j 0m';
-
-    if(sessMasukMs && sessMasukMs > 0){
-      durTotalMs   = km - sessMasukMs;
-      durEfektifMs = hitungDurasiEfektif(sessMasukMs, km, cfg);
-      // Pastikan tidak negatif
-      durEfektifMs = Math.max(0, durEfektifMs);
+    const masukRec = list.find(a=>a.tipe==='masuk' && a.tgl===today);
+    if(masukRec){
+      sessMasukMs = masukRec.ms;
+      durTotalMs   = km - masukRec.ms;
+      durEfektifMs = Math.max(0, hitungDurasiEfektif(masukRec.ms, km, cfg));
       const jj=Math.floor(durEfektifMs/3600000);
       const mm=Math.floor((durEfektifMs%3600000)/60000);
       dur=jj+'j '+mm+'m';
-    } else {
-      // Cari waktu masuk dari data tersimpan
-      const masukRec=list.find(a=>a.tipe==='masuk'&&a.tgl===today);
-      if(masukRec){
-        sessMasukMs=masukRec.ms;
-        durTotalMs=km-masukRec.ms;
-        durEfektifMs=Math.max(0,hitungDurasiEfektif(masukRec.ms,km,cfg));
-        const jj=Math.floor(durEfektifMs/3600000);
-        const mm=Math.floor((durEfektifMs%3600000)/60000);
-        dur=jj+'j '+mm+'m';
-      }
     }
 
     // Update record masuk dengan durasi efektif
@@ -1883,22 +2055,29 @@ function konfirmasi(){
       list[masukIdx].durasi     =dur;
       list[masukIdx].durasiTotal=durTotalMs;
     }
-    list.unshift({tipe:'keluar',jam:j,tgl:today,lokasi:{...lokasiData},foto:fotoData,ms:km});
-    saveUserAbs(curUser.username,list);
+    list.unshift({
+      tipe:'keluar', jam:j, tgl:today,
+      lokasi:{...lokasiData}, foto:fotoData||'',
+      ms:km, durasiMs:durEfektifMs, durasi:dur, durasiTotal:durTotalMs
+    });
+    const ok = await FB.set('absensi/'+curUser.username, list);
+    if(!ok){
+      toast('❌ Gagal save ke server — coba lagi','er');
+      return;
+    }
+    DB.setLocal('absensi', {...getAllAbsensi(), [curUser.username]: list});
 
     document.getElementById('s-keluar').textContent=j;
     document.getElementById('s-dur').textContent=dur;
-    document.getElementById('btnK').disabled=true;
 
-    const iMenit=durTotalMs>0?Math.round((durTotalMs-durEfektifMs)/60000):0;
-    const iInfo=iMenit>0?' · dipotong istirahat '+iMenit+' mnt':'';
-    pushNotif('ok','Absen Keluar',curUser.nama+' keluar '+j+' · Kerja efektif: '+dur+iInfo);
+    pushNotif('ok','Absen Keluar',curUser.nama+' keluar '+j+' · Kerja efektif: '+dur);
     toast('👋 Absen Keluar! Kerja efektif: '+dur,'ok');
   }
   stopCam(true);
   calcGaji();
-  // Refresh badge mode otomatis
+  // Refresh status & mode UI
   if(typeof updateAbsenModeUI==='function') updateAbsenModeUI();
+  if(typeof checkAbsenStatus==='function') checkAbsenStatus();
 }
 
 // ── RIWAYAT ───────────────────────────────────────────
