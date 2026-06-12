@@ -432,7 +432,7 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
     <button class="nb on" onclick="gp('absen',this)" id="nb-absen"><i class="ti ti-fingerprint"></i><span>Absen</span></button>
     <button class="nb" onclick="gp('riwayat',this)"><i class="ti ti-history"></i><span>Riwayat</span></button>
     <button class="nb" onclick="gp('gaji',this)"><i class="ti ti-moneybag"></i><span>Gaji</span></button>
-    <button class="nb" onclick="gp('notif',this)"><i class="ti ti-bell"></i><span>Notif</span><span class="ndot" id="ndot"></span></button>
+    <button class="nb" onclick="gp('notif',this)" id="nb-notif" style="display:none"><i class="ti ti-bell"></i><span>Notif</span><span class="ndot" id="ndot"></span></button>
     <button class="nb" onclick="gp('admin',this)" id="nb-admin" style="display:none"><i class="ti ti-settings"></i><span>Admin</span></button>
     <button class="nb" onclick="doLogout()"><i class="ti ti-logout"></i><span>Keluar</span></button>
   </div>
@@ -1390,6 +1390,9 @@ function initApp(){
   document.getElementById('nb-admin').style.display=curUser.role==='admin'?'':'none';
   const nbDash = document.getElementById('nb-dashboard');
   if(nbDash) nbDash.style.display = curUser.role==='admin' ? '' : 'none';
+  // Notif tab — HANYA untuk admin (karyawan tidak perlu lihat riwayat aktivitas admin)
+  const nbNotif = document.getElementById('nb-notif');
+  if(nbNotif) nbNotif.style.display = curUser.role==='admin' ? '' : 'none';
 
   // Default tab saat baru masuk: Admin → Dashboard, Karyawan → Absen
   if(curUser.role === 'admin'){
