@@ -490,7 +490,7 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
     <div class="cam-box" id="camBox" onclick="startCam()">
       <video id="vid" autoplay playsinline muted></video>
       <canvas id="cvs"></canvas>
-      <div class="cam-ph" id="camPh"><i class="ti ti-camera"></i><p>Ketuk untuk aktifkan kamera</p></div>
+      <div class="cam-ph" id="camPh"><i class="ti ti-camera"></i><p>📷 Mengaktifkan kamera...</p></div>
       <div class="cam-ov" id="camOv">
         <button class="cbt re" id="btnRe" onclick="retake(event)"><i class="ti ti-refresh"></i> Ulang</button>
         <button class="cbt sh" id="btnSh" onclick="snap(event)"><i class="ti ti-camera"></i></button>
@@ -514,16 +514,6 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
       </div>
     </div>
 
-    <!-- TOMBOL MANUAL FALLBACK — kalau auto absen via foto bermasalah -->
-    <div style="background:#fef3c7;border:1px dashed #d97706;border-radius:11px;padding:9px;margin-top:6px">
-      <div style="font-size:10px;font-weight:700;color:#7c2d12;margin-bottom:6px;text-align:center"><i class="ti ti-tool"></i> Absen Manual (kalau kamera/GPS bermasalah)</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-        <button onclick="absenManualCepat('masuk')" style="background:linear-gradient(90deg,#15803d,#16a34a);color:#fff;border:none;border-radius:8px;padding:8px;font-size:11px;font-weight:700;cursor:pointer"><i class="ti ti-login"></i> Masuk Cepat</button>
-        <button onclick="absenManualCepat('keluar')" style="background:linear-gradient(90deg,#dc2626,#ef4444);color:#fff;border:none;border-radius:8px;padding:8px;font-size:11px;font-weight:700;cursor:pointer"><i class="ti ti-logout"></i> Keluar Cepat</button>
-      </div>
-      <div style="font-size:9px;color:#7c2d12;margin-top:5px;text-align:center;line-height:1.4">Tanpa foto · Pakai lokasi terakhir / "Tidak Diketahui"</div>
-    </div>
-
     <div style="text-align:center;font-size:10px;color:var(--mt);padding-top:4px"><i class="ti ti-shield-check" style="font-size:12px;vertical-align:-2px"></i> Data aman di server · Tarif Rp <span id="info-tarif">12.500</span>/jam</div>
   </div>
 
@@ -536,7 +526,10 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
           <option value="all">Semua Karyawan</option>
         </select>
         <select id="rw-filter" onchange="renderRiwayat()" style="padding:6px 10px;border:1px solid var(--br);border-radius:9px;font-size:11px;color:var(--tx);background:#fff;outline:none">
-          <option value="7">7 Hari</option><option value="30">30 Hari</option><option value="all">Semua</option>
+          <option value="1" selected>📅 Hari Ini</option>
+          <option value="7">7 Hari</option>
+          <option value="30">30 Hari</option>
+          <option value="all">Semua</option>
         </select>
       </div>
     </div>
@@ -1411,6 +1404,14 @@ function initApp(){
     if(nbAbsen) nbAbsen.classList.add('on');
     const pgAbsen = document.getElementById('pg-absen');
     if(pgAbsen) pgAbsen.classList.add('on');
+    // Auto-jalankan: status check, GPS deteksi, dan aktifkan kamera (tanpa perlu user klik)
+    setTimeout(()=>{
+      try{ if(typeof updateAbsenModeUI==='function') updateAbsenModeUI(); }catch(e){console.error(e);}
+      try{ if(typeof checkAbsenStatus==='function') checkAbsenStatus(); }catch(e){console.error(e);}
+      try{ if(!lokasiData) getLoc(); }catch(e){console.error(e);}
+      // Kamera otomatis aktif (tanpa user klik dulu)
+      try{ if(typeof startCam==='function') startCam(); }catch(e){console.error(e);}
+    }, 400);
   }
   // Sembunyikan tab Karyawan, Laporan, Setting untuk karyawan
   ['tab-karyawan-btn','tab-laporan-btn','tab-setting-btn'].forEach(id=>{
@@ -1459,10 +1460,14 @@ function gp(id,btn){
   try {
     if(id==='absen' && typeof updateAbsenModeUI==='function'){
       updateAbsenModeUI();
-      // Cek status kesiapan absen (GPS, Camera, Internet)
+      // Cek status kesiapan absen (GPS, Camera, Internet) — otomatis tanpa user klik
       if(typeof checkAbsenStatus==='function') checkAbsenStatus();
-      // Auto-deteksi GPS kalau belum ada (membantu absen jadi 1-step)
+      // Auto-deteksi GPS kalau belum ada
       if(!lokasiData){ setTimeout(()=>{ try{ getLoc(); }catch(e){console.error(e);} }, 200); }
+      // Auto-aktifkan kamera (tanpa user perlu klik dulu)
+      if(!camStream && !fotoData){
+        setTimeout(()=>{ try{ if(typeof startCam==='function') startCam(); }catch(e){console.error(e);} }, 300);
+      }
     }
     if(id==='riwayat') renderRiwayat();
     if(id==='gaji') calcGaji();
@@ -1687,37 +1692,6 @@ async function checkAbsenStatus(){
   }
 }
 
-// ── ABSEN MANUAL CEPAT — fallback kalau kamera/GPS bermasalah ──
-async function absenManualCepat(tipe){
-  // Cek apakah sudah ada absen tipe sama hari ini
-  const today = new Date().toLocaleDateString('id-ID');
-  const list = getUserAbs(curUser.username);
-  const sudahAda = list.find(a => a.tipe===tipe && a.tgl===today);
-  if(sudahAda){
-    toast('❗ Anda sudah absen '+tipe+' hari ini ('+sudahAda.jam+')','er');
-    return;
-  }
-
-  // Untuk absen keluar, pastikan sudah absen masuk
-  if(tipe==='keluar'){
-    const masukHariIni = list.find(a => a.tipe==='masuk' && a.tgl===today);
-    if(!masukHariIni){
-      toast('❗ Anda belum absen masuk hari ini! Klik "Masuk Cepat" dulu.','er');
-      return;
-    }
-  }
-
-  const tipeLabel = tipe==='masuk' ? 'MASUK' : 'KELUAR';
-  if(!confirm(`Absen ${tipeLabel} sekarang?\n\n📅 Tanggal: ${today}\n🕐 Jam: ${new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})}\n📷 Tanpa foto\n📍 ${lokasiData ? 'Lokasi: '+(lokasiData.kota||'GPS terdeteksi') : 'Tanpa lokasi'}\n\nLanjutkan?`)) return;
-
-  // Set data sementara supaya doAbsen() bisa pakai
-  fotoData = null; // tanpa foto
-  if(!lokasiData) lokasiData = {lat:'0', lon:'0', kota:'Tidak Diketahui (Manual)'};
-
-  // Panggil doAbsen langsung
-  await doAbsen(tipe);
-}
-
 // Update tampilan badge absen mode (panggil setiap kali balik ke tab absen)
 function updateAbsenModeUI(){
   const el = document.getElementById('absenModeText');
@@ -1904,13 +1878,13 @@ function inputLokasiManual(){
 function doAbsen(tipe){
   // Foto sekarang opsional — kalau tidak ada, tetap bisa absen (dengan warning)
   if(!fotoData){
-    // Tanpa foto — boleh, tapi cek apakah user sudah konfirmasi via absenManualCepat
+    // Tanpa foto — set ke string kosong, tetap bisa lanjut
     // Kalau dipanggil dari snap() yang gagal, set fotoData ke placeholder transparent
     fotoData = ''; // string kosong = tanpa foto
   }
   if(!lokasiData){
     if(!confirm('⚠️ Lokasi GPS belum terdeteksi. Tetap lanjut absen tanpa lokasi?\n\n(Admin akan lihat "Lokasi tidak diketahui" di riwayat)')){
-      toast('Klik "Deteksi" untuk GPS, atau pakai "Masuk Cepat" untuk absen tanpa GPS','warn');
+      toast('Klik "Deteksi" untuk aktifkan GPS terlebih dahulu','warn');
       return;
     }
     lokasiData = {lat:'0', lon:'0', kota:'Tidak Diketahui'};
@@ -2141,19 +2115,38 @@ async function renderRiwayat(){
 
   // Filter berdasarkan tanggal
   if(filter!=='all'){
-    const cut = Date.now() - parseInt(filter)*86400000;
+    let cut;
+    if(filter === '1'){
+      // "Hari Ini" — dari jam 00:00 hari ini (bukan 24 jam terakhir)
+      const now = new Date();
+      cut = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime();
+    } else {
+      // N hari ke belakang
+      cut = Date.now() - parseInt(filter)*86400000;
+    }
     allRecords = allRecords.filter(r=>r.ms>=cut);
   }
 
   // Urutkan terbaru di atas
   allRecords.sort((a,b)=>(b.ms||0)-(a.ms||0));
 
+  // Label periode untuk header info
+  const periodLabel = filter==='1' ? 'Hari Ini' :
+                      filter==='7' ? '7 Hari Terakhir' :
+                      filter==='30' ? '30 Hari Terakhir' : 'Semua Riwayat';
+
   if(!allRecords.length){
-    el.innerHTML = '<div class="empty"><i class="ti ti-history"></i><p>Belum ada riwayat absensi</p></div>';
+    el.innerHTML = `<div class="empty"><i class="ti ti-history"></i><p>Tidak ada absensi untuk periode "${periodLabel}"</p><p style="font-size:10px;color:var(--mt);margin-top:4px">Coba pilih periode yang lebih panjang</p></div>`;
     return;
   }
 
-  el.innerHTML = allRecords.map(r=>{
+  // Info bar — tampilkan jumlah record dan periode
+  const infoBar = `<div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid var(--br);border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:var(--bd);display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap">
+    <span><i class="ti ti-calendar"></i> Periode: <b>${periodLabel}</b></span>
+    <span style="color:var(--mt);font-weight:600">${allRecords.length} record</span>
+  </div>`;
+
+  el.innerHTML = infoBar + allRecords.map(r=>{
     const mapsUrl    = r.lokasi ? `https://www.google.com/maps?q=${r.lokasi.lat},${r.lokasi.lon}&z=17` : '#';
     const lokasiTeks = r.lokasi ? (r.lokasi.kota||r.lokasi.lat+', '+r.lokasi.lon) : 'Unknown';
     const nameTag    = isAdmin() ? `<div style="font-size:10px;color:${r._warna};font-weight:700;margin-bottom:2px">👤 ${r._nama}</div>` : '';
