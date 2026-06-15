@@ -2135,8 +2135,24 @@ async function calcGaji(){
     if(tglListEl) tglListEl.innerHTML = '<div class="empty" style="padding:30px"><i class="ti ti-users" style="font-size:32px;color:var(--bd)"></i><p style="font-size:11px;color:var(--mt);margin-top:8px;line-height:1.6"><b>Mode Export Semua Karyawan</b><br>Atur rentang tanggal di atas,<br>lalu klik <b>Download Excel Rincian</b><br>untuk download laporan semua karyawan<br>dalam satu file Excel.</p></div>';
     const minggu = document.getElementById('g-minggu');
     if(minggu) minggu.innerHTML='<div style="text-align:center;padding:20px;color:var(--mt);font-size:11px">📋 Mode export semua karyawan aktif</div>';
+
+    // Tetap tampilkan tombol Reset Gaji untuk SEMUA karyawan (admin)
     const resetAdmin = document.getElementById('g-reset-admin');
-    if(resetAdmin) resetAdmin.style.display='none';
+    const resetStatus = document.getElementById('g-reset-status');
+    if(resetAdmin){
+      resetAdmin.style.display='block';
+      if(resetStatus){
+        const allUsers = await FB.get('users') || getUsers();
+        const karyawanCount = Object.entries(allUsers).filter(([,u])=>u.role!=='admin').length;
+        resetStatus.innerHTML = `📋 <b>Mode Reset Semua Karyawan</b> · Total: ${karyawanCount} karyawan<br><span style="font-size:10px;color:#7c2d12">Klik tombol di bawah untuk tandai semua karyawan sudah dibayar sekaligus</span>`;
+      }
+      // Update label tombol jadi "Reset Semua Karyawan"
+      const resetBtn = resetAdmin.querySelector('button[onclick="resetGaji()"]');
+      if(resetBtn){
+        resetBtn.innerHTML = '<i class="ti ti-users"></i> Tandai SEMUA Karyawan Sudah Dibayar';
+        resetBtn.style.background = 'linear-gradient(90deg,#7c3aed,#a855f7)';
+      }
+    }
     return; // Skip hitungan lain
   }
 
@@ -2243,6 +2259,12 @@ async function calcGaji(){
       } else {
         resetStatusEl.textContent = '⚠️ Belum pernah dibayar · Karyawan: '+targetNama;
       }
+    }
+    // Reset label tombol ke default (single karyawan)
+    const resetBtn = resetAdminEl.querySelector('button[onclick="resetGaji()"]');
+    if(resetBtn){
+      resetBtn.innerHTML = '<i class="ti ti-check"></i> Tandai Sudah Dibayar &amp; Reset Gaji';
+      resetBtn.style.background = 'linear-gradient(90deg,#ea580c,#dc2626)';
     }
   } else if(resetAdminEl){
     resetAdminEl.style.display='none';
@@ -3593,9 +3615,12 @@ async function resetGaji(){
     // Tentukan target: dari dropdown atau diri sendiri (default admin = pilih semua jika 'all')
     const empFilter = document.getElementById('g-emp-filter');
     let targetUid = curUser.username;
-    if(empFilter && empFilter.value){
+    if(empFilter && empFilter.value === '__ALL__'){
+      // Mode Reset Semua Karyawan
+      targetUid = '__ALL__';
+    } else if(empFilter && empFilter.value){
       targetUid = empFilter.value;
-    } else if(empFilter){
+    } else if(empFilter && isAdmin()){
       // Admin belum pilih karyawan — tanya mau reset semua
       const semuaConf = confirm('Belum memilih karyawan di dropdown.\n\nKlik OK untuk RESET SEMUA KARYAWAN sekaligus.\nKlik Cancel lalu pilih karyawan dulu untuk reset 1 orang saja.');
       if(!semuaConf) return;
