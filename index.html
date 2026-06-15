@@ -175,6 +175,7 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
 .exp-btn{flex:1;padding:11px;border:none;border-radius:11px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
 .exp-csv{background:#dcfce7;color:#15803d}.exp-pdf{background:#fee2e2;color:#dc2626}
 #login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#e0f2fe,#bae6fd);padding:24px}
+#register-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#e0f2fe,#bae6fd);padding:24px}
 .login-box{background:#fff;border-radius:24px;padding:28px 24px;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(14,165,233,.15)}
 .login-logo{text-align:center;margin-bottom:24px}
 .login-logo .li{font-size:52px}.login-logo .ln{font-size:32px;font-weight:800;color:var(--bd);letter-spacing:4px;margin:4px 0}
@@ -314,6 +315,7 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
     padding:24px;
   }
   #login-screen{position:fixed;inset:0;padding:24px;z-index:200}
+  #register-screen{position:fixed;inset:0;padding:24px;z-index:200}
   .shell{
     max-width:1280px;margin:0 auto;border-radius:24px;overflow:hidden;
     box-shadow:0 25px 80px rgba(2,132,199,.4);
@@ -406,10 +408,61 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
       <button class="pw-eye" onclick="togglePw()"><i class="ti ti-eye" id="eye-ic"></i></button>
     </div>
     <button class="btn btn-b" onclick="doLogin()" style="margin-top:4px"><i class="ti ti-login"></i> Masuk</button>
+
+    <!-- Link Daftar Akun Baru -->
+    <div style="text-align:center;margin-top:12px;padding:10px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px dashed var(--bd);border-radius:10px">
+      <div style="font-size:11px;color:var(--mt);margin-bottom:6px">Belum punya akun?</div>
+      <button onclick="showRegisterScreen()" style="background:#fff;color:var(--bd);border:1px solid var(--bd);border-radius:8px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer">📝 Daftar Akun Baru</button>
+    </div>
     <div style="text-align:center;margin-top:18px;padding-top:14px;border-top:1px solid var(--br)">
       <div style="font-size:13px;margin-bottom:4px">🦉</div>
       <div style="font-size:12px;font-weight:700;color:var(--bd)">OWL Absensi Karyawan</div>
-      <div style="font-size:10px;color:var(--mt);margin-top:3px">© 2025 GII-BOX · Hak Cipta Dilindungi</div>
+      <div style="font-size:10px;color:var(--mt);margin-top:3px">© 2026 GII-BOX · Hak Cipta Dilindungi</div>
+      <div style="font-size:10px;color:var(--mt);margin-top:2px">GPS · Foto Selfie · Kalkulasi Gaji Otomatis</div>
+      <div style="font-size:9px;color:var(--br);margin-top:4px;background:var(--bp);border-radius:6px;padding:4px 8px;display:inline-block">v1.0.0 · Sistem Absensi Digital</div>
+    </div>
+  </div>
+</div>
+
+<!-- REGISTER SCREEN (full page, style sama dengan login) -->
+<div id="register-screen" style="display:none">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="li">🦉</div>
+      <div class="ln">DAFTAR</div>
+      <div class="ls">Buat Akun Karyawan Baru</div>
+    </div>
+    <div class="first-box">
+      <div class="ft">📌 Pendaftaran Mandiri</div>
+      <div class="fd">Isi data Anda dengan benar.<br>Akun akan langsung aktif & bisa langsung absen.<br><br>⚠️ Admin akan verifikasi data Anda.</div>
+    </div>
+    <div class="lerr" id="daftar-err" style="display:none"></div>
+    <label class="flbl">Nama Lengkap *</label>
+    <input type="text" class="fin" id="dfr-nama" placeholder="Sesuai KTP">
+    <label class="flbl">NIK (16 digit) *</label>
+    <input type="text" class="fin" id="dfr-nik" placeholder="Nomor Induk Kependudukan" maxlength="16" inputmode="numeric">
+    <label class="flbl">Jabatan *</label>
+    <input type="text" class="fin" id="dfr-jab" placeholder="Contoh: Packer, Picker, Sortir">
+    <label class="flbl">Divisi</label>
+    <input type="text" class="fin" id="dfr-div" placeholder="Contoh: JETCOM, INBOUND, RRQ">
+    <label class="flbl">Username Login *</label>
+    <input type="text" class="fin" id="dfr-un" placeholder="Huruf kecil, tanpa spasi (min 3 karakter)" autocomplete="off">
+    <label class="flbl">Password *</label>
+    <div class="pw-wrap">
+      <input type="password" class="fin" id="dfr-pw" placeholder="Min. 4 karakter">
+      <button class="pw-eye" onclick="togglePwDfr('dfr-pw','eye-dfr-pw')"><i class="ti ti-eye" id="eye-dfr-pw"></i></button>
+    </div>
+    <label class="flbl">Konfirmasi Password *</label>
+    <div class="pw-wrap">
+      <input type="password" class="fin" id="dfr-pw2" placeholder="Ulangi password">
+      <button class="pw-eye" onclick="togglePwDfr('dfr-pw2','eye-dfr-pw2')"><i class="ti ti-eye" id="eye-dfr-pw2"></i></button>
+    </div>
+    <button class="btn btn-b" onclick="daftarAkun()" id="btn-daftar" style="margin-top:6px"><i class="ti ti-user-plus"></i> Daftar Sekarang</button>
+    <button onclick="showLoginScreen()" style="width:100%;background:transparent;color:var(--mt);border:none;padding:10px;font-size:12px;font-weight:600;cursor:pointer;margin-top:4px">← Kembali ke Halaman Masuk</button>
+    <div style="text-align:center;margin-top:18px;padding-top:14px;border-top:1px solid var(--br)">
+      <div style="font-size:13px;margin-bottom:4px">🦉</div>
+      <div style="font-size:12px;font-weight:700;color:var(--bd)">OWL Absensi Karyawan</div>
+      <div style="font-size:10px;color:var(--mt);margin-top:3px">© 2026 GII-BOX · Hak Cipta Dilindungi</div>
       <div style="font-size:10px;color:var(--mt);margin-top:2px">GPS · Foto Selfie · Kalkulasi Gaji Otomatis</div>
       <div style="font-size:9px;color:var(--br);margin-top:4px;background:var(--bp);border-radius:6px;padding:4px 8px;display:inline-block">v1.0.0 · Sistem Absensi Digital</div>
     </div>
@@ -571,7 +624,7 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
           <button onclick="setGajiPeriode('week')" style="background:#fff;color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:5px 10px;font-size:10px;font-weight:600;cursor:pointer">7 Hari</button>
           <button onclick="setGajiPeriode('30days')" style="background:#fff;color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:5px 10px;font-size:10px;font-weight:600;cursor:pointer">30 Hari</button>
         </div>
-        <button onclick="exportRincianExcel()" style="margin-top:10px;width:100%;background:linear-gradient(90deg,#15803d,#16a34a);color:#fff;border:none;border-radius:9px;padding:10px 14px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 8px rgba(22,163,74,.3)"><i class="ti ti-file-spreadsheet"></i> Download Excel Rincian</button>
+        <div style="margin-top:10px;font-size:10px;color:var(--mt);text-align:center;background:#f0f9ff;border:1px dashed var(--br);border-radius:8px;padding:7px"><i class="ti ti-info-circle"></i> Untuk download Excel laporan, gunakan tab <b>Laporan Admin</b></div>
       </div>
       <div id="g-tanggal-list" style="max-height:400px;overflow-y:auto"></div>
     </div>
@@ -730,7 +783,7 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
       </div>
       <div class="gaji-tot"><div class="gtl">Total Penggajian</div><div class="gtn" id="lap-total-n">Rp 0</div><div class="gtd" id="lap-total-d">0 karyawan</div></div>
       <div class="exp-row">
-        <button class="exp-btn exp-csv" onclick="exportCSV()"><i class="ti ti-file-spreadsheet"></i> Export Excel</button>
+        <button class="exp-btn exp-csv" onclick="exportRincianExcel()"><i class="ti ti-file-spreadsheet"></i> Export Excel</button>
         <button class="exp-btn exp-pdf" onclick="exportPDF()"><i class="ti ti-printer"></i> Cetak PDF</button>
       </div>
     </div>
@@ -990,7 +1043,7 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
 
 <!-- COPYRIGHT -->
 <div style="text-align:center;padding:12px 0 18px;background:#fff;border-top:1px solid var(--bl)">
-  <div style="font-size:11px;color:var(--mt)">© 2025 <strong style="color:var(--bd);letter-spacing:.5px">GII-BOX</strong></div>
+  <div style="font-size:11px;color:var(--mt)">© 2026 <strong style="color:var(--bd);letter-spacing:.5px">GII-BOX</strong></div>
   <div style="font-size:9px;color:var(--br);margin-top:2px;letter-spacing:.3px">OWL Absensi v1.0 · All rights reserved</div>
 </div>
 
@@ -1278,6 +1331,139 @@ function togglePw(){
   ic.className='ti ti-eye'+(i.type==='text'?'-off':'');
 }
 
+// ── DAFTAR AKUN BARU (Karyawan daftar mandiri) ─────────
+// Tampilkan halaman Daftar (full screen, mirip login)
+function showRegisterScreen(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('register-screen').style.display='flex';
+  // Reset error & scroll ke atas
+  const err = document.getElementById('daftar-err');
+  if(err) err.style.display='none';
+  window.scrollTo(0, 0);
+}
+function showLoginScreen(){
+  document.getElementById('register-screen').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+  window.scrollTo(0, 0);
+}
+function togglePwDfr(inputId, iconId){
+  const el = document.getElementById(inputId);
+  const ic = document.getElementById(iconId);
+  if(!el || !ic) return;
+  if(el.type === 'password'){
+    el.type = 'text';
+    ic.className = 'ti ti-eye-off';
+  } else {
+    el.type = 'password';
+    ic.className = 'ti ti-eye';
+  }
+}
+
+async function daftarAkun(){
+  const errEl = document.getElementById('daftar-err');
+  const btnEl = document.getElementById('btn-daftar');
+
+  const showErr = msg => {
+    errEl.style.display='block';
+    errEl.innerHTML = '❌ '+msg;
+  };
+
+  // Ambil & validasi input
+  const nama = document.getElementById('dfr-nama').value.trim();
+  const nik  = document.getElementById('dfr-nik').value.trim();
+  const jab  = document.getElementById('dfr-jab').value.trim();
+  const div  = document.getElementById('dfr-div').value.trim();
+  const un   = document.getElementById('dfr-un').value.trim().toLowerCase().replace(/\s/g,'');
+  const pw   = document.getElementById('dfr-pw').value;
+  const pw2  = document.getElementById('dfr-pw2').value;
+
+  errEl.style.display='none';
+
+  if(!nama) return showErr('Nama lengkap wajib diisi');
+  if(!nik || nik.length<6) return showErr('NIK minimal 6 digit');
+  if(!/^\d+$/.test(nik)) return showErr('NIK harus berupa angka saja');
+  if(!jab) return showErr('Jabatan wajib diisi');
+  if(!un || un.length<3) return showErr('Username minimal 3 karakter');
+  if(!/^[a-z0-9_]+$/.test(un)) return showErr('Username hanya boleh huruf kecil, angka, underscore');
+  if(un === 'admin') return showErr('Username "admin" sudah dipakai sistem');
+  if(!pw || pw.length<4) return showErr('Password minimal 4 karakter');
+  if(pw !== pw2) return showErr('Konfirmasi password tidak cocok');
+
+  // Disable tombol selama proses
+  btnEl.disabled = true;
+  btnEl.textContent = '⏳ Mendaftarkan...';
+
+  try {
+    // Cek ke Firebase apakah username & NIK sudah ada
+    const allUsers = await FB.get('users') || {};
+    if(allUsers[un]){
+      btnEl.disabled = false;
+      btnEl.textContent = '📝 Daftar Sekarang';
+      return showErr(`Username "${un}" sudah dipakai. Pilih username lain.`);
+    }
+    // Cek NIK duplikat
+    const nikDuplikat = Object.values(allUsers).find(u => u.id === nik);
+    if(nikDuplikat){
+      btnEl.disabled = false;
+      btnEl.textContent = '📝 Daftar Sekarang';
+      return showErr(`NIK "${nik}" sudah terdaftar atas nama ${nikDuplikat.nama}. Hubungi admin jika ini error.`);
+    }
+
+    // Buat object user baru
+    const warnaList = ['#0ea5e9','#15803d','#dc2626','#7c3aed','#ea580c','#0891b2','#65a30d','#ca8a04'];
+    const warna = warnaList[Math.floor(Math.random()*warnaList.length)];
+    const newUser = {
+      pw: pw,
+      nama: nama,
+      jab: jab,
+      div: div || '-',
+      id: nik,
+      role: 'karyawan',
+      warna: warna,
+      registeredAt: Date.now(),
+      registeredSelf: true  // tandai bahwa daftar mandiri (untuk admin tahu)
+    };
+
+    // Simpan ke Firebase
+    const ok = await FB.set('users/'+un, newUser);
+    if(!ok){
+      btnEl.disabled = false;
+      btnEl.textContent = '📝 Daftar Sekarang';
+      return showErr('Gagal simpan ke server. Cek internet & coba lagi.');
+    }
+
+    // Update local cache
+    allUsers[un] = newUser;
+    DB.setLocal('users', allUsers);
+
+    // Catat ke notif admin
+    pushNotif('admin','Karyawan Daftar Mandiri',`👋 <b>${nama}</b> (NIK ${nik}) daftar akun sendiri sebagai <b>${jab}</b> · username: <code>${un}</code>`);
+
+    // Sukses — pindah ke login screen & auto-fill credentials
+    showLoginScreen();
+    document.getElementById('uname').value = un;
+    document.getElementById('upass').value = pw;
+    document.getElementById('lerr').style.background = '#dcfce7';
+    document.getElementById('lerr').style.color = '#15803d';
+    document.getElementById('lerr').textContent = '✅ Akun berhasil dibuat! Silakan klik Masuk.';
+    document.getElementById('lerr').style.display = 'block';
+
+    // Reset form
+    ['dfr-nama','dfr-nik','dfr-jab','dfr-div','dfr-un','dfr-pw','dfr-pw2'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.value = '';
+    });
+
+    toast('🎉 Akun '+nama+' berhasil dibuat!','ok');
+
+  } catch(e){
+    showErr('Terjadi error: '+e.message);
+  } finally {
+    btnEl.disabled = false;
+    btnEl.textContent = '📝 Daftar Sekarang';
+  }
+}
+
 async function doLogin(){
   const u   = document.getElementById('uname').value.trim().toLowerCase();
   const p   = document.getElementById('upass').value;
@@ -1303,6 +1489,8 @@ async function doLogin(){
       err.style.display = 'none';
       updateLoader('Login berhasil','Memuat aplikasi...');
       document.getElementById('login-screen').style.display = 'none';
+      const regScreen = document.getElementById('register-screen');
+      if(regScreen) regScreen.style.display = 'none';
       document.getElementById('app-screen').style.display  = 'block';
       document.getElementById('first-box').style.display   = 'none';
       initApp();
@@ -1323,6 +1511,10 @@ async function doLogin(){
 }
 
 function doLogout(){
+  // Konfirmasi sebelum keluar (mencegah klik tidak sengaja)
+  const nama = (curUser && curUser.nama) ? curUser.nama : 'Anda';
+  if(!confirm(`🚪 Yakin mau keluar?\n\n${nama} akan keluar dari akun.\nUntuk masuk kembali, harus login ulang.`)) return;
+
   stopCam(true);
   clearSession(); // ← hapus session saat logout
   curUser=null;fotoData=null;lokasiData=null;sessMasukMs=null;
@@ -2132,7 +2324,7 @@ async function calcGaji(){
     document.getElementById('g-jam').textContent    = '—';
     document.getElementById('g-total2').textContent = '—';
     const tglListEl = document.getElementById('g-tanggal-list');
-    if(tglListEl) tglListEl.innerHTML = '<div class="empty" style="padding:30px"><i class="ti ti-users" style="font-size:32px;color:var(--bd)"></i><p style="font-size:11px;color:var(--mt);margin-top:8px;line-height:1.6"><b>Mode Export Semua Karyawan</b><br>Atur rentang tanggal di atas,<br>lalu klik <b>Download Excel Rincian</b><br>untuk download laporan semua karyawan<br>dalam satu file Excel.</p></div>';
+    if(tglListEl) tglListEl.innerHTML = '<div class="empty" style="padding:30px"><i class="ti ti-users" style="font-size:32px;color:var(--bd)"></i><p style="font-size:11px;color:var(--mt);margin-top:8px;line-height:1.6"><b>Mode Reset Semua Karyawan</b><br>Klik tombol di bawah untuk menandai<br>semua karyawan sudah dibayar sekaligus.<br><br>Untuk <b>download Excel</b> rincian gaji,<br>buka tab <b>Laporan Admin</b>.</p></div>';
     const minggu = document.getElementById('g-minggu');
     if(minggu) minggu.innerHTML='<div style="text-align:center;padding:20px;color:var(--mt);font-size:11px">📋 Mode export semua karyawan aktif</div>';
 
@@ -2832,16 +3024,21 @@ function renderEmpList(){
   const list=Object.entries(users).filter(([,u])=>u.role!=='admin'&&(!filter||u.nama.toLowerCase().includes(filter)));
   const el=document.getElementById('emp-list');if(!el)return;
   if(!list.length){el.innerHTML='<div class="empty"><i class="ti ti-users"></i><p>Belum ada karyawan</p></div>';return;}
-  el.innerHTML=list.map(([uid,u])=>`
+  el.innerHTML=list.map(([uid,u])=>{
+    const badgeDaftar = u.registeredSelf
+      ? '<span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:5px;font-size:9px;font-weight:700;margin-left:4px" title="Karyawan daftar akun sendiri">📝 Daftar Mandiri</span>'
+      : '';
+    return `
     <div class="emp-item">
       ${avatarHTML(u)}
-      <div class="emp-tx"><div class="en">${u.nama}</div><div class="ed">${u.jab} · ${u.div||'-'} · ${u.id}</div></div>
+      <div class="emp-tx"><div class="en">${u.nama}${badgeDaftar}</div><div class="ed">${u.jab} · ${u.div||'-'} · ${u.id}</div></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
         <button class="ic-btn" style="background:#dcfce7;color:#15803d" onclick="lihatRiwayatKaryawan('${uid}','${u.nama.replace(/'/g,"\\'")}')"  title="Lihat Riwayat"><i class="ti ti-history"></i></button>
         <button class="ic-btn edit" onclick="editEmp('${uid}')" title="Edit"><i class="ti ti-edit"></i></button>
         <button class="ic-btn del" onclick="hapusEmp('${uid}','${u.nama.replace(/'/g,"\\'")}')" title="Hapus"><i class="ti ti-trash"></i></button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 // Lihat riwayat absensi semua karyawan
@@ -3720,25 +3917,49 @@ async function exportRincianExcel(){
   toast('⏳ Menyiapkan Excel...','');
   showLoader('Menyiapkan Excel','Mengambil data dari server');
   try{
-  const inMulai = document.getElementById('g-tgl-mulai');
-  const inAkhir = document.getElementById('g-tgl-akhir');
-  if(!inMulai || !inMulai.value || !inAkhir.value){
-    hideLoader();
-    toast('❗ Pilih rentang tanggal dulu','er');return;
-  }
-  const tglMulai = new Date(inMulai.value+'T00:00:00').getTime();
-  const tglAkhir = new Date(inAkhir.value+'T23:59:59').getTime();
-  const tglMulaiStr = new Date(inMulai.value).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
-  const tglAkhirStr = new Date(inAkhir.value).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
-  const periodeStr  = tglMulaiStr+' s/d '+tglAkhirStr;
-  const periodeShort= inMulai.value+'_'+inAkhir.value;
 
-  // Tentukan target karyawan: kalau admin pilih dropdown, kalau bukan = diri sendiri
-  let targetUid = curUser.username;
-  const empFilter = document.getElementById('g-emp-filter');
-  if(curUser.role==='admin' && empFilter && empFilter.value){
-    targetUid = empFilter.value;
+  // ── BACA FILTER: prefer dari LAPORAN (karena tombol Export Excel ada di sana) ──
+  // Fallback ke Gaji kalau Laporan tidak ada/kosong
+  const lapMulai = document.getElementById('lap-tgl-mulai');
+  const lapAkhir = document.getElementById('lap-tgl-akhir');
+  const lapEmp   = document.getElementById('sel-emp');
+
+  let tglMulaiInput, tglAkhirInput, empFilterValue;
+
+  // Cek apakah lagi di tab Laporan (lap field ada & ada value)
+  if(lapMulai && lapMulai.value && lapAkhir && lapAkhir.value){
+    tglMulaiInput = lapMulai.value;
+    tglAkhirInput = lapAkhir.value;
+    // sel-emp di Laporan pakai value 'all' untuk semua karyawan
+    if(lapEmp && lapEmp.value === 'all'){
+      empFilterValue = '__ALL__';
+    } else if(lapEmp && lapEmp.value){
+      empFilterValue = lapEmp.value;
+    } else {
+      empFilterValue = '__ALL__'; // default Laporan = semua
+    }
+  } else {
+    // Fallback ke filter dari Gaji
+    const inMulai = document.getElementById('g-tgl-mulai');
+    const inAkhir = document.getElementById('g-tgl-akhir');
+    if(!inMulai || !inMulai.value || !inAkhir || !inAkhir.value){
+      hideLoader();
+      toast('❗ Pilih rentang tanggal dulu di Laporan/Gaji','er');return;
+    }
+    tglMulaiInput = inMulai.value;
+    tglAkhirInput = inAkhir.value;
+    const gajiEmp = document.getElementById('g-emp-filter');
+    empFilterValue = (curUser.role==='admin' && gajiEmp && gajiEmp.value) ? gajiEmp.value : curUser.username;
   }
+
+  const tglMulai = new Date(tglMulaiInput+'T00:00:00').getTime();
+  const tglAkhir = new Date(tglAkhirInput+'T23:59:59').getTime();
+  const tglMulaiStr = new Date(tglMulaiInput).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+  const tglAkhirStr = new Date(tglAkhirInput).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+  const periodeStr  = tglMulaiStr+' s/d '+tglAkhirStr;
+  const periodeShort= tglMulaiInput+'_'+tglAkhirInput;
+
+  const targetUid = empFilterValue;
 
   // Ambil data dari Firebase
   const [fbUsers,fbAbsensi,fbCfg]= await Promise.all([FB.get('users'),FB.get('absensi'),FB.get('config')]);
