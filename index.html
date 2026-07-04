@@ -26,7 +26,7 @@ function xhr(method, url, body){
   return new Promise((resolve, reject)=>{
     const x = new XMLHttpRequest();
     x.open(method, url, true);
-    x.timeout = 15000; // 15 detik timeout
+    x.timeout = 25000; // 25 detik timeout (naik dari 15 untuk koneksi lambat)
     x.setRequestHeader('Content-Type', 'application/json');
     x.onload = ()=>{
       if(x.status>=200 && x.status<300){
@@ -37,32 +37,63 @@ function xhr(method, url, body){
       }
     };
     x.onerror = ()=> reject(new Error('Network error / koneksi gagal'));
-    x.ontimeout = ()=> reject(new Error('Timeout — server tidak merespons dalam 15 detik'));
+    x.ontimeout = ()=> reject(new Error('Timeout — server tidak merespons dalam 25 detik'));
     x.send(body ? JSON.stringify(body) : null);
   });
+}
+
+// Helper untuk retry: coba maksimal N kali dengan delay antar retry
+// onRetry callback dipanggil setiap kali retry, untuk update UI loader
+async function xhrRetry(method, url, body, maxRetries=3, onRetry=null){
+  let lastError;
+  for(let i=0; i<maxRetries; i++){
+    try {
+      if(i > 0 && typeof onRetry === 'function'){
+        onRetry(i+1, maxRetries);
+      }
+      return await xhr(method, url, body);
+    } catch(e){
+      lastError = e;
+      console.warn(`xhr retry ${i+1}/${maxRetries} failed:`, e.message);
+      if(i < maxRetries-1){
+        // Delay bertambah: 1s, 2s, 4s (exponential backoff)
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
+      }
+    }
+  }
+  throw lastError;
 }
 
 const FB = {
   get: async (path) => {
     try {
-      return await xhr('GET', FB_BASE + '/' + path + '.json');
+      return await xhrRetry('GET', FB_BASE + '/' + path + '.json', null, 2);
     } catch(e){ console.warn('FB.get error:', path, e.message); return null; }
   },
   // Versi safe untuk operasi yang akan re-save data (edit/hapus/tambah)
   // Return {ok, list, error} — ok=false kalau network error (jangan overwrite!)
+  // Pakai retry 3x untuk toleransi koneksi lambat
   getSafe: async (path) => {
     try {
-      const data = await xhr('GET', FB_BASE + '/' + path + '.json');
-      // Sukses: data bisa array, object, atau null (genuinely empty)
+      const data = await xhrRetry('GET', FB_BASE + '/' + path + '.json', null, 3, (attempt, max) => {
+        // Update loader kalau ada — supaya user tahu sistem sedang retry
+        if(typeof updateLoader === 'function'){
+          try{ updateLoader('Menghubungkan Ulang', `Percobaan ${attempt}/${max} — koneksi lambat, mohon tunggu...`); }catch(e){}
+        }
+      });
       return {ok:true, data: data};
     } catch(e){
-      console.warn('FB.getSafe error:', path, e.message);
+      console.warn('FB.getSafe error setelah 3x retry:', path, e.message);
       return {ok:false, data: null, error: e.message};
     }
   },
   set: async (path, data) => {
     try {
-      await xhr('PUT', FB_BASE + '/' + path + '.json', data);
+      await xhrRetry('PUT', FB_BASE + '/' + path + '.json', data, 3, (attempt, max) => {
+        if(typeof updateLoader === 'function'){
+          try{ updateLoader('Mengirim Ulang', `Percobaan ${attempt}/${max} — mengunggah data...`); }catch(e){}
+        }
+      });
       console.log('✅ FB.set OK:', path);
       return true;
     } catch(e){ console.warn('❌ FB.set ERROR:', path, e.message); return false; }
@@ -1756,12 +1787,22 @@ function handleFotoUpload(e){
 function snap(e){
   if(e) e.stopPropagation();
   const v=document.getElementById('vid'),c=document.getElementById('cvs');
-  c.width=v.videoWidth||480;c.height=v.videoHeight||320;
-  const ctx=c.getContext('2d');ctx.drawImage(v,0,0);
-  ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(0,c.height-34,c.width,34);
-  ctx.fillStyle='#fff';ctx.font='bold 11px Arial';ctx.textAlign='left';ctx.textBaseline='middle';
-  ctx.fillText('OWL · '+curUser.nama+' · '+new Date().toLocaleString('id-ID'),10,c.height-11);
-  fotoData=c.toDataURL('image/jpeg',.82);
+  // Resize foto max 480px width (kalau lebih besar) — bantu upload lebih ringan
+  const maxW = 480;
+  const vidW = v.videoWidth || 480;
+  const vidH = v.videoHeight || 320;
+  const scale = vidW > maxW ? maxW/vidW : 1;
+  c.width  = Math.round(vidW * scale);
+  c.height = Math.round(vidH * scale);
+  const ctx=c.getContext('2d');
+  ctx.drawImage(v,0,0,c.width,c.height);
+  ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(0,c.height-30,c.width,30);
+  ctx.fillStyle='#fff';ctx.font='bold 10px Arial';ctx.textAlign='left';ctx.textBaseline='middle';
+  ctx.fillText('OWL · '+curUser.nama+' · '+new Date().toLocaleString('id-ID'),8,c.height-11);
+  // Quality 0.7 (sebelumnya 0.82) — foto lebih ringan tapi masih jelas untuk verifikasi wajah
+  fotoData=c.toDataURL('image/jpeg',.7);
+  const fotoSizeKB = Math.round(fotoData.length * 0.75 / 1024);
+  console.log('📸 Foto size:', fotoSizeKB, 'KB');
   c.style.display='block';v.style.display='none';
   document.getElementById('btnSh').style.display='none';
   document.getElementById('btnRe').style.display='flex';
@@ -2066,22 +2107,51 @@ async function konfirmasi(){
   const today=n.toLocaleDateString('id-ID');
   const cfg=getCfg();
 
-  toast('⏳ Menyimpan absen...','');
+  showLoader('Menyimpan Absen','Menghubungkan ke server...');
 
-  // PENTING: Ambil list TERBARU dari Firebase dulu — kalau gagal, JANGAN overwrite
+  // Ambil list TERBARU dari Firebase — FB.getSafe sudah retry 3x
   const safeRes = await FB.getSafe('absensi/'+curUser.username);
   if(!safeRes.ok){
-    toast('❌ KONEKSI GAGAL — absen tidak tersimpan, coba lagi','er');
-    alert('⚠️ Tidak bisa konek ke Firebase\n\nError: '+safeRes.error+'\n\nAbsen DIBATALKAN supaya data riwayat Anda tidak hilang.\nCoba lagi setelah internet stabil.');
+    hideLoader();
+    toast('❌ Koneksi lambat — coba lagi setelah wifi/data stabil','er');
+    // Modal error helpful
+    document.getElementById('md-title').textContent='📡 Koneksi Bermasalah';
+    document.getElementById('md-ft').style.display='none';
+    document.getElementById('md-info').innerHTML=
+      `<div style="text-align:center;padding:6px 0">
+        <div style="font-size:36px;margin-bottom:8px">📶</div>
+        <div style="font-weight:700;color:#dc2626;font-size:13px;margin-bottom:8px">Absen tidak berhasil disimpan</div>
+        <div style="font-size:11px;color:var(--mt);margin-bottom:10px;line-height:1.6">
+          Server tidak merespons setelah <b>3x percobaan</b>.<br>
+          Data lama Anda <b>tetap aman</b> — tidak ada yang hilang.
+        </div>
+        <div style="background:#fef3c7;border:1px solid #fdba74;border-radius:9px;padding:8px;font-size:10px;color:#7c2d12;text-align:left;line-height:1.6">
+          <b>💡 Coba solusi berikut:</b><br>
+          1. Cek koneksi wifi/data — apakah kuat?<br>
+          2. Pindah ke lokasi dengan sinyal lebih baik<br>
+          3. Matikan-hidupkan data seluler<br>
+          4. Tunggu 30 detik, lalu foto ulang & absen
+        </div>
+      </div>`;
+    document.querySelector('#mdAbsen .mk').textContent='🔄 Coba Absen Ulang';
+    document.querySelector('#mdAbsen .mk').onclick = ()=>{
+      closeMd('mdAbsen');
+      konfirmasi();
+    };
+    document.querySelector('#mdAbsen .mc').style.display='';
+    openMd('mdAbsen');
     return;
   }
   // Gabungkan list dari Firebase (latest) + entry baru
   let list = Array.isArray(safeRes.data) ? safeRes.data : [];
 
+  updateLoader('Menyimpan Absen','Mengunggah data absen...');
+
   if(absenPending==='masuk'){
-    // Cek apakah sudah ada absen masuk hari ini di Firebase
+    // Cek duplikat masuk hari ini
     const sudahMasuk = list.find(a=>a.tipe==='masuk' && a.tgl===today);
     if(sudahMasuk){
+      hideLoader();
       toast('❗ Anda sudah absen masuk hari ini ('+sudahMasuk.jam+')','er');
       return;
     }
@@ -2095,8 +2165,9 @@ async function konfirmasi(){
     };
     list.unshift(rec);
     const ok = await FB.set('absensi/'+curUser.username, list);
+    hideLoader();
     if(!ok){
-      toast('❌ Gagal save ke server — coba lagi','er');
+      toast('❌ Gagal upload — coba lagi','er');
       return;
     }
     DB.setLocal('absensi', {...getAllAbsensi(), [curUser.username]: list});
@@ -2110,9 +2181,10 @@ async function konfirmasi(){
       toast('🎉 Absen Masuk berhasil!','ok');
     }
   } else {
-    // Cek apakah sudah ada absen keluar hari ini
+    // Cek duplikat keluar hari ini
     const sudahKeluar = list.find(a=>a.tipe==='keluar' && a.tgl===today);
     if(sudahKeluar){
+      hideLoader();
       toast('❗ Anda sudah absen keluar hari ini ('+sudahKeluar.jam+')','er');
       return;
     }
@@ -2142,8 +2214,9 @@ async function konfirmasi(){
       ms:km, durasiMs:durEfektifMs, durasi:dur, durasiTotal:durTotalMs
     });
     const ok = await FB.set('absensi/'+curUser.username, list);
+    hideLoader();
     if(!ok){
-      toast('❌ Gagal save ke server — coba lagi','er');
+      toast('❌ Gagal upload — coba lagi','er');
       return;
     }
     DB.setLocal('absensi', {...getAllAbsensi(), [curUser.username]: list});
@@ -2156,7 +2229,6 @@ async function konfirmasi(){
   }
   stopCam(true);
   calcGaji();
-  // Refresh status & mode UI
   if(typeof updateAbsenModeUI==='function') updateAbsenModeUI();
 }
 
