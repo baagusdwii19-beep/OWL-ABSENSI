@@ -2316,28 +2316,90 @@ async function renderRiwayat(){
   }
 
   // Info bar — tampilkan jumlah record dan periode
+  // ── GROUP by uid + tanggal — 1 baris per karyawan per hari ──
+  // Sehingga admin lihat "HANES YUS: Masuk 08:59 · Keluar 17:00" bukan terpisah
+  const grouped = {};
+  allRecords.forEach(r=>{
+    const key = (r._uid||curUser.username) + '|' + r.tgl;
+    if(!grouped[key]){
+      grouped[key] = {
+        uid: r._uid || curUser.username,
+        nama: r._nama || curUser.nama,
+        warna: r._warna || (curUser.warna||'#0ea5e9'),
+        tgl: r.tgl,
+        ms: 0,       // untuk sort (max ms dari masuk/keluar)
+        masuk: null,
+        keluar: null
+      };
+    }
+    if(r.tipe === 'masuk')  grouped[key].masuk  = r;
+    if(r.tipe === 'keluar') grouped[key].keluar = r;
+    // Update ms untuk sort — pakai yang paling terbaru
+    if((r.ms||0) > grouped[key].ms) grouped[key].ms = r.ms||0;
+  });
+
+  // Urutkan grup terbaru di atas
+  const groupList = Object.values(grouped).sort((a,b)=>b.ms - a.ms);
+
   const infoBar = `<div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid var(--br);border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:var(--bd);display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap">
     <span><i class="ti ti-calendar"></i> Periode: <b>${periodLabel}</b></span>
-    <span style="color:var(--mt);font-weight:600">${allRecords.length} record</span>
+    <span style="color:var(--mt);font-weight:600">${groupList.length} hari kerja · ${allRecords.length} record</span>
   </div>`;
 
-  el.innerHTML = infoBar + allRecords.map(r=>{
-    const mapsUrl    = r.lokasi ? `https://www.google.com/maps?q=${r.lokasi.lat},${r.lokasi.lon}&z=17` : '#';
-    const lokasiTeks = r.lokasi ? (r.lokasi.kota||r.lokasi.lat+', '+r.lokasi.lon) : 'Unknown';
-    const nameTag    = isAdmin() ? `<div style="font-size:10px;color:${r._warna};font-weight:700;margin-bottom:2px">👤 ${r._nama}</div>` : '';
-    const isMasuk    = r.tipe==='masuk';
-    const labelColor = isMasuk ? '#15803d' : '#dc2626';
-    const jamColor   = isMasuk ? '#15803d' : '#dc2626';
-    return `<div class="ri">
-      <div class="ri-ic ${isMasuk?'m':'k'}"><i class="ti ti-${isMasuk?'login':'logout'}"></i></div>
-      <div class="ri-tx">
-        ${nameTag}
-        <div class="rn" style="color:${labelColor};font-weight:800">${isMasuk?'Absen Masuk':'Absen Keluar'}${r.terlambat?' <span class="bdg bdg-a">Terlambat</span>':''}${r.durasi?' <span class="bdg bdg-b">'+r.durasi+'</span>':''}</div>
-        <div class="rd">${r.tgl} · <a href="${mapsUrl}" target="_blank" style="color:#0ea5e9;text-decoration:none">📍 ${lokasiTeks}</a></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px">
-        ${r.foto?`<img class="ri-ft" src="${r.foto}" onclick="previewFoto(this.src)" alt="foto">`:''}
-        <div class="ri-jm" style="color:${jamColor};font-weight:800">${r.jam}</div>
+  el.innerHTML = infoBar + groupList.map(g=>{
+    const m = g.masuk;
+    const k = g.keluar;
+    const nameTag = isAdmin() ? `<div style="font-size:11px;color:${g.warna};font-weight:800;margin-bottom:4px">👤 ${g.nama}</div>` : '';
+
+    // Info Masuk
+    const masukJam   = m ? m.jam : '--:--';
+    const masukLok   = m && m.lokasi ? (m.lokasi.kota||'?') : '-';
+    const masukMaps  = m && m.lokasi ? `https://www.google.com/maps?q=${m.lokasi.lat},${m.lokasi.lon}&z=17` : '#';
+    const masukFoto  = m && m.foto ? `<img class="ri-ft" src="${m.foto}" onclick="previewFoto(this.src)" alt="foto" style="width:36px;height:36px;border-radius:6px;object-fit:cover;cursor:pointer">` : '<div style="width:36px;height:36px;border-radius:6px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:14px">-</div>';
+    const terlambat  = m && m.terlambat ? '<span class="bdg bdg-a" style="font-size:9px;padding:1px 5px;margin-left:4px">Terlambat</span>' : '';
+
+    // Info Keluar
+    const keluarJam  = k ? k.jam : '--:--';
+    const keluarLok  = k && k.lokasi ? (k.lokasi.kota||'?') : '-';
+    const keluarMaps = k && k.lokasi ? `https://www.google.com/maps?q=${k.lokasi.lat},${k.lokasi.lon}&z=17` : '#';
+    const keluarFoto = k && k.foto ? `<img class="ri-ft" src="${k.foto}" onclick="previewFoto(this.src)" alt="foto" style="width:36px;height:36px;border-radius:6px;object-fit:cover;cursor:pointer">` : '<div style="width:36px;height:36px;border-radius:6px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:14px">-</div>';
+
+    // Durasi kerja (dari record masuk)
+    const durasi = m && m.durasi ? m.durasi : (k && k.durasi ? k.durasi : '');
+    const durasiBdg = durasi ? `<span class="bdg bdg-b" style="font-size:9px;padding:1px 5px;margin-left:4px">⏱ ${durasi}</span>` : '';
+
+    return `<div style="background:#fff;border:1px solid var(--br);border-radius:12px;padding:10px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+      ${nameTag}
+      <div style="font-size:11px;color:var(--mt);margin-bottom:8px;font-weight:600"><i class="ti ti-calendar" style="font-size:11px"></i> ${g.tgl}${durasiBdg}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <!-- MASUK -->
+        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:9px;padding:8px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <div style="width:22px;height:22px;border-radius:50%;background:#dcfce7;color:#15803d;display:flex;align-items:center;justify-content:center"><i class="ti ti-login" style="font-size:12px"></i></div>
+            <div style="font-size:10px;font-weight:800;color:#15803d">MASUK${terlambat}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            ${masukFoto}
+            <div style="flex:1;min-width:0">
+              <div style="font-size:15px;font-weight:800;color:#15803d">${masukJam}</div>
+              <a href="${masukMaps}" target="_blank" style="font-size:9px;color:#0ea5e9;text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📍 ${masukLok}</a>
+            </div>
+          </div>
+        </div>
+        <!-- KELUAR -->
+        <div style="background:${k?'#fef2f2':'#f8fafc'};border:1px solid ${k?'#fecaca':'#e2e8f0'};border-radius:9px;padding:8px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <div style="width:22px;height:22px;border-radius:50%;background:${k?'#fee2e2':'#f1f5f9'};color:${k?'#dc2626':'#94a3b8'};display:flex;align-items:center;justify-content:center"><i class="ti ti-logout" style="font-size:12px"></i></div>
+            <div style="font-size:10px;font-weight:800;color:${k?'#dc2626':'#94a3b8'}">${k?'KELUAR':'BELUM KELUAR'}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            ${keluarFoto}
+            <div style="flex:1;min-width:0">
+              <div style="font-size:15px;font-weight:800;color:${k?'#dc2626':'#94a3b8'}">${keluarJam}</div>
+              ${k ? `<a href="${keluarMaps}" target="_blank" style="font-size:9px;color:#0ea5e9;text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📍 ${keluarLok}</a>` : '<div style="font-size:9px;color:#94a3b8">Belum tercatat</div>'}
+            </div>
+          </div>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -3135,6 +3197,15 @@ async function lihatRiwayatKaryawan(uid, nama){
         <div class="modal" style="max-width:540px;max-height:85vh;overflow-y:auto">
           <h3 id="riw-kry-title">Riwayat Absensi</h3>
           <div id="riw-kry-summary" style="background:var(--bl);padding:10px 12px;border-radius:10px;margin-bottom:12px;font-size:11px;color:var(--bd);font-weight:600"></div>
+          <div id="riw-kry-filter" style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid var(--br);border-radius:10px;padding:8px;margin-bottom:10px">
+            <div style="font-size:10px;color:var(--mt);font-weight:700;margin-bottom:5px">📆 FILTER PERIODE:</div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap">
+              <button class="rw-filter-btn on" data-p="1" onclick="filterRiwayatKry('1',this)" style="flex:1;min-width:70px;background:var(--bd);color:#fff;border:1px solid var(--bd);border-radius:7px;padding:6px 8px;font-size:10px;font-weight:700;cursor:pointer">📅 Harian</button>
+              <button class="rw-filter-btn" data-p="7" onclick="filterRiwayatKry('7',this)" style="flex:1;min-width:70px;background:#fff;color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:6px 8px;font-size:10px;font-weight:700;cursor:pointer">📆 Mingguan</button>
+              <button class="rw-filter-btn" data-p="30" onclick="filterRiwayatKry('30',this)" style="flex:1;min-width:70px;background:#fff;color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:6px 8px;font-size:10px;font-weight:700;cursor:pointer">🗓️ Bulanan</button>
+              <button class="rw-filter-btn" data-p="all" onclick="filterRiwayatKry('all',this)" style="flex:1;min-width:70px;background:#fff;color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:6px 8px;font-size:10px;font-weight:700;cursor:pointer">📋 Semua</button>
+            </div>
+          </div>
           <div id="riw-kry-list"></div>
           <div class="modal-acts"><button class="mk" style="width:100%" onclick="closeMd('mdRiwayatKry')">Tutup</button></div>
         </div>`;
@@ -3142,6 +3213,17 @@ async function lihatRiwayatKaryawan(uid, nama){
     }
 
     document.getElementById('riw-kry-title').textContent = '📋 Riwayat: '+nama;
+
+    // Simpan context untuk re-render saat filter berubah
+    window._riwKryCtx = { uid, nama, list };
+    // Reset filter ke default (Harian)
+    document.querySelectorAll('.rw-filter-btn').forEach(b=>{
+      const isDefault = b.getAttribute('data-p') === '1';
+      b.classList.toggle('on', isDefault);
+      b.style.background = isDefault ? 'var(--bd)' : '#fff';
+      b.style.color = isDefault ? '#fff' : 'var(--bd)';
+      b.style.borderColor = isDefault ? 'var(--bd)' : 'var(--br)';
+    });
 
     // Tambahkan tombol "Tambah Absensi Manual"
     let addBtn = document.getElementById('riw-kry-add-btn');
@@ -3155,46 +3237,137 @@ async function lihatRiwayatKaryawan(uid, nama){
     }
     addBtn.onclick = ()=> tambahAbsensiManual(uid, nama);
 
-    if(!list.length){
-      document.getElementById('riw-kry-summary').textContent = 'Belum ada absensi';
-      document.getElementById('riw-kry-list').innerHTML = '<div class="empty"><i class="ti ti-clock-off"></i><p>Karyawan belum pernah absen</p></div>';
-    } else {
-      // Hitung statistik
-      const masukList = list.filter(r=>r.tipe==='masuk');
-      const terlambat = masukList.filter(r=>r.terlambat).length;
-      const totalJamAsli = masukList.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000;
-      document.getElementById('riw-kry-summary').innerHTML = 
-        `📅 ${masukList.length} hari kerja · ⏰ ${fmtJam(totalJamAsli)} jam · ⚠️ ${terlambat} terlambat`;
-
-      // Urutkan terbaru di atas
-      const sorted = [...list].sort((a,b)=>(b.ms||0)-(a.ms||0));
-      document.getElementById('riw-kry-list').innerHTML = sorted.map((r,idx)=>{
-        const isMasuk = r.tipe==='masuk';
-        const bgIc = isMasuk?(r.terlambat?'#fef3c7':'#dcfce7'):'#fee2e2';
-        const cIc  = isMasuk?(r.terlambat?'#b45309':'#15803d'):'#dc2626';
-        const ic   = isMasuk?'login':'logout';
-        const dur  = r.durasi?'<div style="font-size:10px;color:var(--mt);margin-top:3px">⏱️ '+r.durasi+'</div>':'';
-        const tag  = r.terlambat?'<span class="bdg bdg-a" style="font-size:9px">Terlambat</span>':'';
-        // Index di list asli (sebelum sort) untuk referensi edit
-        const origIdx = list.indexOf(r);
-        return `<div class="emp-item" style="border:1px solid var(--br);border-radius:11px;padding:10px;margin-bottom:8px">
-          <div class="emp-av" style="background:${bgIc};color:${cIc}"><i class="ti ti-${ic}" style="font-size:18px"></i></div>
-          <div class="emp-tx" style="flex:1">
-            <div class="en" style="font-size:12px">Absen ${isMasuk?'Masuk':'Keluar'} ${tag}</div>
-            <div class="ed" style="font-size:10px">📅 ${r.tgl} · 🕐 ${r.jam}</div>
-            <div class="ed" style="font-size:10px">📍 ${typeof r.lokasi==='object' && r.lokasi ? (r.lokasi.kota||r.lokasi.nama||(r.lokasi.lat+', '+r.lokasi.lon)) : (r.lokasi||'-')}</div>
-            ${dur}
-          </div>
-          <div style="display:flex;flex-direction:column;gap:4px">
-            <button class="ic-btn edit" onclick="editJamAbsensi('${uid}',${origIdx})" title="Edit Jam"><i class="ti ti-edit"></i></button>
-            <button class="ic-btn del" onclick="hapusAbsensi('${uid}',${origIdx},'${nama.replace(/'/g,"\\'")}')" title="Hapus"><i class="ti ti-trash"></i></button>
-          </div>
-        </div>`;
-      }).join('');
-    }
-
+    // Render list dengan filter default 'Harian' (1 hari)
+    renderRiwayatKryList('1');
     openMd('mdRiwayatKry');
   });
+}
+
+// Filter riwayat karyawan (di modal admin)
+function filterRiwayatKry(periode, btn){
+  document.querySelectorAll('.rw-filter-btn').forEach(b=>{
+    const isActive = b === btn;
+    b.classList.toggle('on', isActive);
+    b.style.background = isActive ? 'var(--bd)' : '#fff';
+    b.style.color = isActive ? '#fff' : 'var(--bd)';
+    b.style.borderColor = isActive ? 'var(--bd)' : 'var(--br)';
+  });
+  renderRiwayatKryList(periode);
+}
+
+// Render list absensi di modal riwayat karyawan (dipanggil pertama & saat filter berubah)
+function renderRiwayatKryList(periode){
+  const ctx = window._riwKryCtx;
+  if(!ctx) return;
+  const { uid, nama, list: fullList } = ctx;
+
+  // Filter berdasarkan periode
+  let list = fullList;
+  if(periode !== 'all'){
+    let cut;
+    if(periode === '1'){
+      // Harian — dari jam 00:00 hari ini
+      const now = new Date();
+      cut = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime();
+    } else {
+      // Mingguan (7) atau Bulanan (30)
+      cut = Date.now() - parseInt(periode)*86400000;
+    }
+    list = fullList.filter(r=>(r.ms||0) >= cut);
+  }
+
+  const periodLabel = periode==='1' ? 'Hari Ini' :
+                      periode==='7' ? 'Mingguan (7 hari)' :
+                      periode==='30' ? 'Bulanan (30 hari)' : 'Semua Waktu';
+
+  if(!list.length){
+    document.getElementById('riw-kry-summary').innerHTML =
+      `📆 Periode: <b>${periodLabel}</b> · Tidak ada absensi`;
+    document.getElementById('riw-kry-list').innerHTML =
+      `<div class="empty"><i class="ti ti-clock-off"></i><p>Tidak ada absensi untuk periode "${periodLabel}"</p><p style="font-size:10px;color:var(--mt);margin-top:4px">Coba pilih periode yang lebih panjang</p></div>`;
+    return;
+  }
+
+  // Hitung statistik dari list yang sudah difilter
+  const masukList = list.filter(r=>r.tipe==='masuk');
+  const terlambat = masukList.filter(r=>r.terlambat).length;
+  const totalJamAsli = masukList.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000;
+  document.getElementById('riw-kry-summary').innerHTML =
+    `📆 <b>${periodLabel}</b> · 📅 ${masukList.length} hari kerja · ⏰ ${fmtJam(totalJamAsli)} · ⚠️ ${terlambat} terlambat`;
+
+  // Urutkan terbaru di atas
+  const sorted = [...list].sort((a,b)=>(b.ms||0)-(a.ms||0));
+
+  // Group by tanggal — 1 card per tanggal (masuk + keluar)
+  const grpTgl = {};
+  sorted.forEach(r=>{
+    const key = r.tgl;
+    if(!grpTgl[key]){
+      grpTgl[key] = { tgl:r.tgl, ms:0, masuk:null, keluar:null, masukIdx:-1, keluarIdx:-1 };
+    }
+    // Index dalam list ASLI (fullList) — supaya edit/hapus tetap benar
+    const origIdx = fullList.indexOf(r);
+    if(r.tipe==='masuk'){ grpTgl[key].masuk = r; grpTgl[key].masukIdx = origIdx; }
+    if(r.tipe==='keluar'){ grpTgl[key].keluar = r; grpTgl[key].keluarIdx = origIdx; }
+    if((r.ms||0) > grpTgl[key].ms) grpTgl[key].ms = r.ms||0;
+  });
+  const grpList = Object.values(grpTgl).sort((a,b)=>b.ms - a.ms);
+
+  const escName = nama.replace(/'/g,"\\'");
+  document.getElementById('riw-kry-list').innerHTML = grpList.map(g=>{
+    const m = g.masuk, k = g.keluar;
+    const lokTeks = rec => {
+      if(!rec || !rec.lokasi) return '-';
+      if(typeof rec.lokasi === 'object') return rec.lokasi.kota||rec.lokasi.nama||(rec.lokasi.lat+', '+rec.lokasi.lon);
+      return rec.lokasi;
+    };
+    const durasi = (m && m.durasi) || (k && k.durasi) || '';
+    const durasiBdg = durasi ? `<span class="bdg bdg-b" style="font-size:9px;padding:1px 5px;margin-left:4px">⏱ ${durasi}</span>` : '';
+
+    // Masuk section
+    const mBtn = m ? `
+      <div style="display:flex;gap:4px;margin-top:6px">
+        <button class="ic-btn edit" onclick="editJamAbsensi('${uid}',${g.masukIdx})" title="Edit Jam Masuk" style="width:26px;height:26px"><i class="ti ti-edit" style="font-size:12px"></i></button>
+        <button class="ic-btn del" onclick="hapusAbsensi('${uid}',${g.masukIdx},'${escName}')" title="Hapus Masuk" style="width:26px;height:26px"><i class="ti ti-trash" style="font-size:12px"></i></button>
+      </div>` : '';
+    const mSection = m ? `
+      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:9px;padding:8px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <div style="width:20px;height:20px;border-radius:50%;background:#dcfce7;color:#15803d;display:flex;align-items:center;justify-content:center"><i class="ti ti-login" style="font-size:11px"></i></div>
+          <div style="font-size:9px;font-weight:800;color:#15803d">MASUK${m.terlambat?' <span class="bdg bdg-a" style="font-size:8px;padding:0 4px">Terlambat</span>':''}${m.manual?' <span class="bdg bdg-a" style="font-size:8px;padding:0 4px;background:#fef3c7;color:#92400e">Manual</span>':''}</div>
+        </div>
+        <div style="font-size:15px;font-weight:800;color:#15803d">${m.jam}</div>
+        <div style="font-size:9px;color:var(--mt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">📍 ${lokTeks(m)}</div>
+        ${mBtn}
+      </div>` : `
+      <div style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:9px;padding:8px;color:#94a3b8;text-align:center;font-size:10px;display:flex;align-items:center;justify-content:center;min-height:80px">Tidak absen masuk</div>`;
+
+    // Keluar section
+    const kBtn = k ? `
+      <div style="display:flex;gap:4px;margin-top:6px">
+        <button class="ic-btn edit" onclick="editJamAbsensi('${uid}',${g.keluarIdx})" title="Edit Jam Keluar" style="width:26px;height:26px"><i class="ti ti-edit" style="font-size:12px"></i></button>
+        <button class="ic-btn del" onclick="hapusAbsensi('${uid}',${g.keluarIdx},'${escName}')" title="Hapus Keluar" style="width:26px;height:26px"><i class="ti ti-trash" style="font-size:12px"></i></button>
+      </div>` : '';
+    const kSection = k ? `
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:9px;padding:8px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <div style="width:20px;height:20px;border-radius:50%;background:#fee2e2;color:#dc2626;display:flex;align-items:center;justify-content:center"><i class="ti ti-logout" style="font-size:11px"></i></div>
+          <div style="font-size:9px;font-weight:800;color:#dc2626">KELUAR${k.manual?' <span class="bdg bdg-a" style="font-size:8px;padding:0 4px;background:#fef3c7;color:#92400e">Manual</span>':''}</div>
+        </div>
+        <div style="font-size:15px;font-weight:800;color:#dc2626">${k.jam}</div>
+        <div style="font-size:9px;color:var(--mt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">📍 ${lokTeks(k)}</div>
+        ${kBtn}
+      </div>` : `
+      <div style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:9px;padding:8px;color:#94a3b8;text-align:center;font-size:10px;display:flex;align-items:center;justify-content:center;min-height:80px">Belum keluar</div>`;
+
+    return `<div style="background:#fff;border:1px solid var(--br);border-radius:11px;padding:10px;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:700;color:var(--tx);margin-bottom:8px"><i class="ti ti-calendar" style="font-size:12px"></i> ${g.tgl}${durasiBdg}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${mSection}
+        ${kSection}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // Edit jam absensi karyawan
