@@ -516,6 +516,7 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
     <button class="nb on" onclick="gp('absen',this)" id="nb-absen"><i class="ti ti-fingerprint"></i><span>Absen</span></button>
     <button class="nb" onclick="gp('riwayat',this)"><i class="ti ti-history"></i><span>Riwayat</span></button>
     <button class="nb" onclick="gp('gaji',this)"><i class="ti ti-moneybag"></i><span>Gaji</span></button>
+    <button class="nb" onclick="gp('rekapphl',this)" id="nb-rekapphl" style="display:none"><i class="ti ti-clipboard-list"></i><span>Rekap PHL</span></button>
     <button class="nb" onclick="gp('notif',this)" id="nb-notif" style="display:none"><i class="ti ti-bell"></i><span>Notif</span><span class="ndot" id="ndot"></span></button>
     <button class="nb" onclick="gp('admin',this)" id="nb-admin" style="display:none"><i class="ti ti-settings"></i><span>Admin</span></button>
     <button class="nb" onclick="doLogout()"><i class="ti ti-logout"></i><span>Keluar</span></button>
@@ -659,6 +660,73 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
       </div>
       <div id="g-tanggal-list" style="max-height:400px;overflow-y:auto"></div>
     </div>
+  </div>
+
+  <!-- REKAP PHL (Pekerja Harian Lepas) -->
+  <div class="pg" id="pg-rekapphl">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div class="sec" style="margin-bottom:0"><i class="ti ti-clipboard-list"></i> Rekap PHL Harian</div>
+      <input type="date" id="phl-tgl" onchange="loadPHL()" style="padding:6px 10px;border:1px solid var(--br);border-radius:9px;font-size:11px;color:var(--tx);background:#fff;outline:none">
+    </div>
+
+    <!-- Info panel -->
+    <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border:1px solid #fdba74;border-radius:11px;padding:10px 12px;margin-bottom:10px;font-size:11px;color:#7c2d12;line-height:1.5">
+      <b>📋 Rekap Pekerja Harian Lepas</b><br>
+      Catat pekerja lepas yang bekerja pada tanggal terpilih. Data tersimpan per tanggal di server.
+    </div>
+
+    <!-- Form Input -->
+    <div style="background:#fff;border:1px solid var(--br);border-radius:12px;padding:12px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.04)">
+      <div style="font-size:11px;font-weight:800;color:var(--bd);margin-bottom:10px"><i class="ti ti-plus"></i> TAMBAH PHL BARU</div>
+
+      <label class="flbl">Nama Karyawan</label>
+      <input type="text" class="fin" id="phl-nama" placeholder="Nama lengkap PHL" autocomplete="off">
+
+      <label class="flbl">Jenis Kelamin</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <label style="display:flex;align-items:center;gap:8px;background:#f0f9ff;border:2px solid transparent;border-radius:9px;padding:9px 12px;cursor:pointer;font-size:12px;font-weight:600;color:#0369a1" id="phl-gender-L-lbl">
+          <input type="radio" name="phl-gender" value="L" id="phl-gender-L" style="width:16px;height:16px;cursor:pointer" onchange="updatePhlGenderUI()"> 👨 Laki-laki
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;background:#fdf2f8;border:2px solid transparent;border-radius:9px;padding:9px 12px;cursor:pointer;font-size:12px;font-weight:600;color:#be185d" id="phl-gender-P-lbl">
+          <input type="radio" name="phl-gender" value="P" id="phl-gender-P" style="width:16px;height:16px;cursor:pointer" onchange="updatePhlGenderUI()"> 👩 Perempuan
+        </label>
+      </div>
+
+      <label class="flbl">Pekerjaan</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">
+        <label style="display:flex;align-items:center;justify-content:center;gap:5px;background:#f0fdf4;border:2px solid transparent;border-radius:9px;padding:9px 8px;cursor:pointer;font-size:11px;font-weight:700;color:#15803d;text-align:center" id="phl-job-packer-lbl">
+          <input type="radio" name="phl-job" value="packer" id="phl-job-packer" style="width:15px;height:15px;cursor:pointer" onchange="updatePhlJobUI()"> 📦 Packer
+        </label>
+        <label style="display:flex;align-items:center;justify-content:center;gap:5px;background:#fef3c7;border:2px solid transparent;border-radius:9px;padding:9px 8px;cursor:pointer;font-size:11px;font-weight:700;color:#a16207;text-align:center" id="phl-job-picker-lbl">
+          <input type="radio" name="phl-job" value="picker" id="phl-job-picker" style="width:15px;height:15px;cursor:pointer" onchange="updatePhlJobUI()"> 🛒 Picker
+        </label>
+        <label style="display:flex;align-items:center;justify-content:center;gap:5px;background:#fef2f2;border:2px solid transparent;border-radius:9px;padding:9px 8px;cursor:pointer;font-size:11px;font-weight:700;color:#b91c1c;text-align:center" id="phl-job-bongkaran-lbl">
+          <input type="radio" name="phl-job" value="bongkaran" id="phl-job-bongkaran" style="width:15px;height:15px;cursor:pointer" onchange="updatePhlJobUI()"> 🚚 Bongkaran
+        </label>
+      </div>
+
+      <div style="background:#f0f9ff;border:1px dashed var(--br);border-radius:9px;padding:8px;margin-bottom:10px;font-size:10px;color:var(--bd);text-align:center;line-height:1.5">
+        <b>⏰ Total Jam otomatis dihitung</b><br>
+        dari selisih waktu Check-in ke Check-out
+      </div>
+
+      <button class="btn btn-b" onclick="tambahPHL()" style="margin-top:8px;background:linear-gradient(90deg,#0284c7,#0ea5e9)"><i class="ti ti-login"></i> Check-in PHL</button>
+    </div>
+
+    <!-- Summary -->
+    <div id="phl-summary" style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid var(--br);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--bd);font-weight:600"></div>
+
+    <!-- Toolbar: Check-out All -->
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+      <button onclick="checkoutSemuaPHL()" id="btn-checkout-all" style="flex:1;min-width:140px;background:linear-gradient(90deg,#dc2626,#ef4444);color:#fff;border:none;border-radius:9px;padding:9px 12px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 6px rgba(239,68,68,.3)"><i class="ti ti-logout"></i> Check-out Semua</button>
+    </div>
+
+    <!-- List PHL -->
+    <div class="sec" style="font-size:12px;margin-bottom:8px"><i class="ti ti-users"></i> Daftar PHL</div>
+    <div id="phl-list"></div>
+
+    <!-- Tombol Export Excel -->
+    <button onclick="exportPHL()" style="margin-top:14px;width:100%;background:linear-gradient(90deg,#15803d,#16a34a);color:#fff;border:none;border-radius:9px;padding:10px 14px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 8px rgba(22,163,74,.3)"><i class="ti ti-file-spreadsheet"></i> Export Excel Rekap</button>
   </div>
 
   <!-- NOTIF -->
@@ -1362,6 +1430,544 @@ function togglePw(){
   ic.className='ti ti-eye'+(i.type==='text'?'-off':'');
 }
 
+// ── REKAP PHL (Pekerja Harian Lepas) ────────────────────
+// Data disimpan di Firebase path: /owl/phl/{YYYY-MM-DD}
+// Format: array of {id, nama, gender, jam, ms, by}
+let phlEditingId = null; // untuk mode edit
+
+// Format tanggal HTML input (YYYY-MM-DD) → path Firebase & sebaliknya
+function phlTglKey(dateStr){
+  // dateStr dari <input type="date"> = "2026-07-04"
+  return dateStr;
+}
+
+// Update tampilan radio button gender agar highlight yang aktif
+function updatePhlGenderUI(){
+  const l = document.getElementById('phl-gender-L');
+  const p = document.getElementById('phl-gender-P');
+  const lLbl = document.getElementById('phl-gender-L-lbl');
+  const pLbl = document.getElementById('phl-gender-P-lbl');
+  if(!l || !p || !lLbl || !pLbl) return;
+  if(l.checked){
+    lLbl.style.borderColor = '#0369a1';
+    lLbl.style.background = '#dbeafe';
+    pLbl.style.borderColor = 'transparent';
+    pLbl.style.background = '#fdf2f8';
+  } else if(p.checked){
+    pLbl.style.borderColor = '#be185d';
+    pLbl.style.background = '#fce7f3';
+    lLbl.style.borderColor = 'transparent';
+    lLbl.style.background = '#f0f9ff';
+  }
+}
+
+// Update tampilan radio button pekerjaan agar highlight yang aktif
+function updatePhlJobUI(){
+  const jobs = [
+    {v:'packer',    color:'#15803d', bgActive:'#dcfce7', bgIdle:'#f0fdf4'},
+    {v:'picker',    color:'#a16207', bgActive:'#fde68a', bgIdle:'#fef3c7'},
+    {v:'bongkaran', color:'#b91c1c', bgActive:'#fecaca', bgIdle:'#fef2f2'}
+  ];
+  jobs.forEach(j=>{
+    const inp = document.getElementById('phl-job-'+j.v);
+    const lbl = document.getElementById('phl-job-'+j.v+'-lbl');
+    if(!inp || !lbl) return;
+    if(inp.checked){
+      lbl.style.borderColor = j.color;
+      lbl.style.background  = j.bgActive;
+    } else {
+      lbl.style.borderColor = 'transparent';
+      lbl.style.background  = j.bgIdle;
+    }
+  });
+}
+
+// Set tanggal default & load data
+function initRekapPHL(){
+  const inp = document.getElementById('phl-tgl');
+  if(inp && !inp.value){
+    // Default: hari ini format YYYY-MM-DD
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth()+1).padStart(2,'0');
+    const d = String(now.getDate()).padStart(2,'0');
+    inp.value = `${y}-${m}-${d}`;
+  }
+  loadPHL();
+}
+
+// Load data PHL untuk tanggal terpilih dari Firebase
+async function loadPHL(){
+  const tglInput = document.getElementById('phl-tgl');
+  if(!tglInput || !tglInput.value) return;
+  const tglKey = phlTglKey(tglInput.value);
+
+  const listEl = document.getElementById('phl-list');
+  const sumEl = document.getElementById('phl-summary');
+  if(listEl) listEl.innerHTML = '<div class="empty"><i class="ti ti-loader"></i><p>Memuat...</p></div>';
+  if(sumEl) sumEl.innerHTML = '⏳ Memuat data...';
+
+  const data = await FB.get('phl/'+tglKey);
+  const list = Array.isArray(data) ? data : [];
+  renderPHLList(list);
+}
+
+function renderPHLList(list){
+  const listEl = document.getElementById('phl-list');
+  const sumEl = document.getElementById('phl-summary');
+  if(!listEl) return;
+
+  // Format tanggal untuk display
+  const tglVal = document.getElementById('phl-tgl').value;
+  const tglDisp = tglVal ? new Date(tglVal+'T00:00:00').toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : '';
+
+  if(!list.length){
+    if(sumEl) sumEl.innerHTML = `📅 <b>${tglDisp}</b> · Belum ada data PHL`;
+    listEl.innerHTML = '<div class="empty"><i class="ti ti-users-off"></i><p>Belum ada PHL terdaftar untuk tanggal ini</p><p style="font-size:10px;color:var(--mt);margin-top:4px">Tambahkan lewat form di atas</p></div>';
+    return;
+  }
+
+  // Statistik
+  const jmlLaki = list.filter(x=>x.gender==='L').length;
+  const jmlPerempuan = list.filter(x=>x.gender==='P').length;
+  // Total jam otomatis dihitung: kalau sudah checkout pakai jam actual, kalau belum = 0
+  const totalJam = list.reduce((s,x)=>{
+    if(x.status === 'checkedout' && x.checkoutMs){
+      const jc = hitungJamPHL(x.checkinMs || x.ms, x.checkoutMs);
+      return s + jc.jamDecimal;
+    }
+    return s;
+  }, 0);
+  const totalJamRounded = Math.round(totalJam*100)/100;
+  // Breakdown per pekerjaan
+  const jmlPacker    = list.filter(x=>x.pekerjaan==='packer').length;
+  const jmlPicker    = list.filter(x=>x.pekerjaan==='picker').length;
+  const jmlBongkaran = list.filter(x=>x.pekerjaan==='bongkaran').length;
+  // Breakdown status check-in / check-out
+  const jmlCheckin  = list.filter(x=>x.status==='checkedin' || !x.status).length;
+  const jmlCheckout = list.filter(x=>x.status==='checkedout').length;
+
+  if(sumEl){
+    sumEl.innerHTML = `📅 <b>${tglDisp}</b><br>
+      👥 Total: <b>${list.length}</b> PHL · 👨 ${jmlLaki}L · 👩 ${jmlPerempuan}P · ⏰ <b>${totalJamRounded}</b> jam terakumulasi<br>
+      <span style="color:#15803d">📦 ${jmlPacker} Packer</span> · <span style="color:#a16207">🛒 ${jmlPicker} Picker</span> · <span style="color:#b91c1c">🚚 ${jmlBongkaran} Bongkaran</span><br>
+      <span style="color:#0369a1">🟢 ${jmlCheckin} Masih Bekerja</span> · <span style="color:#15803d">✅ ${jmlCheckout} Sudah Check-out</span>`;
+  }
+
+  // Enable/disable tombol Check-out Semua
+  const btnCheckoutAll = document.getElementById('btn-checkout-all');
+  if(btnCheckoutAll){
+    if(jmlCheckin === 0){
+      btnCheckoutAll.disabled = true;
+      btnCheckoutAll.style.opacity = '0.5';
+      btnCheckoutAll.style.cursor = 'not-allowed';
+      btnCheckoutAll.innerHTML = '<i class="ti ti-check"></i> Semua Sudah Check-out';
+    } else {
+      btnCheckoutAll.disabled = false;
+      btnCheckoutAll.style.opacity = '1';
+      btnCheckoutAll.style.cursor = 'pointer';
+      btnCheckoutAll.innerHTML = `<i class="ti ti-logout"></i> Check-out Semua (${jmlCheckin})`;
+    }
+  }
+
+  // Urutkan: yang belum checkout di atas, lalu berdasarkan waktu input (terbaru)
+  const sorted = [...list].sort((a,b)=>{
+    const aOut = a.status==='checkedout' ? 1 : 0;
+    const bOut = b.status==='checkedout' ? 1 : 0;
+    if(aOut !== bOut) return aOut - bOut; // belum checkout dulu
+    return (b.ms||0)-(a.ms||0);
+  });
+
+  const jobStyle = {
+    packer:    {emoji:'📦', label:'Packer',    color:'#15803d', bg:'#dcfce7'},
+    picker:    {emoji:'🛒', label:'Picker',    color:'#a16207', bg:'#fde68a'},
+    bongkaran: {emoji:'🚚', label:'Bongkaran', color:'#b91c1c', bg:'#fecaca'}
+  };
+
+  listEl.innerHTML = sorted.map((r,i)=>{
+    const genderEmoji = r.gender==='L' ? '👨' : '👩';
+    const genderColor = r.gender==='L' ? '#0369a1' : '#be185d';
+    const genderBg = r.gender==='L' ? '#dbeafe' : '#fce7f3';
+    const genderLabel = r.gender==='L' ? 'Laki-laki' : 'Perempuan';
+    const job = jobStyle[r.pekerjaan];
+    const jobBadge = job
+      ? `<span style="background:${job.bg};color:${job.color};padding:1px 6px;border-radius:5px;font-size:9px;font-weight:800">${job.emoji} ${job.label}</span>`
+      : '<span style="background:#f1f5f9;color:#94a3b8;padding:1px 6px;border-radius:5px;font-size:9px;font-weight:600">- (tanpa job)</span>';
+
+    const sudahCheckout = r.status === 'checkedout';
+    const cardBorder = sudahCheckout ? '#86efac' : '#fdba74';
+    const cardBg     = sudahCheckout ? '#f0fdf4' : '#fff';
+    const statusBadge = sudahCheckout
+      ? '<span style="background:#dcfce7;color:#15803d;padding:1px 6px;border-radius:5px;font-size:9px;font-weight:800">✅ Sudah Check-out</span>'
+      : '<span style="background:#fef3c7;color:#a16207;padding:1px 6px;border-radius:5px;font-size:9px;font-weight:800">🟢 Sedang Bekerja</span>';
+
+    // Format tampilan jam: kalau sudah checkout tampil "Jj Mm", kalau belum tampil "-"
+    let jamDisplay;
+    if(sudahCheckout){
+      const jamCalc = hitungJamPHL(r.checkinMs || r.ms, r.checkoutMs);
+      jamDisplay = jamCalc.jamText;
+    } else {
+      jamDisplay = 'masih bekerja';
+    }
+
+    // Format waktu checkin/checkout untuk display
+    const checkinJam = r.checkinMs
+      ? new Date(r.checkinMs).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})
+      : '';
+    const checkoutJam = r.checkoutMs
+      ? new Date(r.checkoutMs).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})
+      : '';
+    const waktuInfo = checkinJam
+      ? `<span style="color:var(--mt);font-size:9px">In: ${checkinJam}${checkoutJam?' · Out: '+checkoutJam:''}</span>`
+      : '';
+
+    // Tombol aksi
+    const btnCheckout = !sudahCheckout
+      ? `<button onclick="checkoutPHL('${r.id}','${r.nama.replace(/'/g,"\\'")}')" title="Check-out" style="background:linear-gradient(90deg,#dc2626,#ef4444);color:#fff;border:none;border-radius:7px;padding:6px 10px;font-size:10px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px"><i class="ti ti-logout" style="font-size:11px"></i> Out</button>`
+      : `<button onclick="cancelCheckoutPHL('${r.id}','${r.nama.replace(/'/g,"\\'")}')" title="Batalkan check-out" style="background:#f1f5f9;color:var(--mt);border:1px solid var(--br);border-radius:7px;padding:6px 10px;font-size:10px;font-weight:600;cursor:pointer"><i class="ti ti-arrow-back-up" style="font-size:11px"></i> Batal</button>`;
+
+    return `<div style="background:${cardBg};border:1px solid ${cardBorder};border-radius:11px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+      <div style="width:36px;height:36px;border-radius:50%;background:${genderBg};color:${genderColor};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${genderEmoji}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:800;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.nama} ${statusBadge}</div>
+        <div style="font-size:10px;color:var(--mt);margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="color:${genderColor};font-weight:600">${genderLabel}</span>
+          ${jobBadge}
+          <span style="color:${sudahCheckout?'var(--bd)':'#a16207'};font-weight:700">⏰ ${jamDisplay}</span>
+          ${waktuInfo}
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+        ${btnCheckout}
+        <div style="display:flex;gap:4px">
+          <button class="ic-btn edit" onclick="editPHL('${r.id}')" title="Edit" style="width:28px;height:28px"><i class="ti ti-edit" style="font-size:12px"></i></button>
+          <button class="ic-btn del" onclick="hapusPHL('${r.id}','${r.nama.replace(/'/g,"\\'")}')" title="Hapus" style="width:28px;height:28px"><i class="ti ti-trash" style="font-size:12px"></i></button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Hitung jam kerja dari selisih checkinMs & checkoutMs
+// Return object {jamDecimal, jamText} — misal {8.25, "8j 15m"}
+function hitungJamPHL(checkinMs, checkoutMs){
+  if(!checkinMs || !checkoutMs || checkoutMs <= checkinMs){
+    return { jamDecimal: 0, jamText: '-' };
+  }
+  const diffMs = checkoutMs - checkinMs;
+  const jamDecimal = Math.round((diffMs/3600000)*100)/100; // 2 decimal
+  const jj = Math.floor(diffMs/3600000);
+  const mm = Math.floor((diffMs%3600000)/60000);
+  const jamText = `${jj}j ${mm<10?'0'+mm:mm}m`;
+  return { jamDecimal, jamText };
+}
+
+// Tambah PHL baru ke tanggal terpilih
+async function tambahPHL(){
+  const tglInput = document.getElementById('phl-tgl');
+  const namaInput = document.getElementById('phl-nama');
+  const gL = document.getElementById('phl-gender-L');
+  const gP = document.getElementById('phl-gender-P');
+  const jPacker    = document.getElementById('phl-job-packer');
+  const jPicker    = document.getElementById('phl-job-picker');
+  const jBongkaran = document.getElementById('phl-job-bongkaran');
+
+  const tglKey = tglInput.value;
+  const nama = namaInput.value.trim();
+  const gender = gL.checked ? 'L' : (gP.checked ? 'P' : '');
+  const pekerjaan = jPacker.checked ? 'packer' : (jPicker.checked ? 'picker' : (jBongkaran.checked ? 'bongkaran' : ''));
+
+  if(!tglKey){ toast('❗ Pilih tanggal dulu','er'); return; }
+  if(!nama){ toast('❗ Nama karyawan wajib diisi','er'); namaInput.focus(); return; }
+  if(!gender){ toast('❗ Pilih jenis kelamin','er'); return; }
+  if(!pekerjaan){ toast('❗ Pilih pekerjaan (Packer/Picker/Bongkaran)','er'); return; }
+
+  // Ambil list yang sudah ada (safe — retry 3x)
+  const safeRes = await FB.getSafe('phl/'+tglKey);
+  if(!safeRes.ok){
+    toast('❌ Koneksi lambat — data lama aman, coba lagi','er');
+    alert('⚠️ Tidak bisa konek ke server\n\nError: '+safeRes.error+'\n\nOperasi DIBATALKAN supaya data lama tidak hilang.');
+    return;
+  }
+  let list = Array.isArray(safeRes.data) ? safeRes.data : [];
+
+  if(phlEditingId){
+    // Mode edit — update data (jam tetap ambil dari checkin/checkout otomatis)
+    const idx = list.findIndex(x => x.id === phlEditingId);
+    if(idx >= 0){
+      list[idx].nama = nama;
+      list[idx].gender = gender;
+      list[idx].pekerjaan = pekerjaan;
+      // Recalculate jam kalau sudah ada checkoutMs
+      if(list[idx].checkoutMs){
+        list[idx].jam = hitungJamPHL(list[idx].checkinMs, list[idx].checkoutMs).jamDecimal;
+      }
+      list[idx].updatedAt = Date.now();
+    }
+    const ok = await FB.set('phl/'+tglKey, list);
+    if(!ok){ toast('❌ Gagal simpan — coba lagi','er'); return; }
+    toast('✅ Data '+nama+' diperbarui','ok');
+    pushNotif('admin','Edit Rekap PHL',`📝 Data PHL <b>${nama}</b> (${pekerjaan}) tanggal ${tglKey} diperbarui`);
+    phlEditingId = null;
+    const btnTambah = document.querySelector('#pg-rekapphl .btn.btn-b');
+    if(btnTambah) btnTambah.innerHTML = '<i class="ti ti-login"></i> Check-in PHL';
+  } else {
+    // Mode check-in baru (jam otomatis nol dulu, akan dihitung saat check-out)
+    const now = Date.now();
+    const rec = {
+      id: 'phl_' + now + '_' + Math.random().toString(36).slice(2,7),
+      nama, gender, pekerjaan,
+      jam: 0, // auto-calculated saat check-out
+      ms: now,
+      status: 'checkedin',
+      checkinMs: now,
+      checkoutMs: null,
+      by: curUser.nama
+    };
+    list.unshift(rec);
+    const ok = await FB.set('phl/'+tglKey, list);
+    if(!ok){ toast('❌ Gagal simpan — coba lagi','er'); return; }
+    const jamCheckin = new Date(now).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+    toast('✅ '+nama+' Check-in '+jamCheckin,'ok');
+    pushNotif('admin','Check-in PHL',`➕ Check-in <b>${nama}</b> (${gender==='L'?'L':'P'}, ${pekerjaan}) jam ${jamCheckin} tanggal ${tglKey}`);
+  }
+
+  // Reset form
+  namaInput.value = '';
+  if(gL) gL.checked = false;
+  if(gP) gP.checked = false;
+  if(jPacker) jPacker.checked = false;
+  if(jPicker) jPicker.checked = false;
+  if(jBongkaran) jBongkaran.checked = false;
+  updatePhlGenderUI();
+  updatePhlJobUI();
+  namaInput.focus();
+
+  renderPHLList(list);
+}
+
+// Edit PHL — isi form dengan data existing
+async function editPHL(id){
+  const tglKey = document.getElementById('phl-tgl').value;
+  const data = await FB.get('phl/'+tglKey);
+  const list = Array.isArray(data) ? data : [];
+  const rec = list.find(x => x.id === id);
+  if(!rec){ toast('❗ Data tidak ditemukan','er'); return; }
+
+  document.getElementById('phl-nama').value = rec.nama;
+  document.getElementById('phl-gender-'+rec.gender).checked = true;
+  // Isi pekerjaan kalau ada
+  if(rec.pekerjaan){
+    const jobEl = document.getElementById('phl-job-'+rec.pekerjaan);
+    if(jobEl) jobEl.checked = true;
+  }
+  updatePhlGenderUI();
+  updatePhlJobUI();
+
+  phlEditingId = id;
+  const btnTambah = document.querySelector('#pg-rekapphl .btn.btn-b');
+  if(btnTambah) btnTambah.innerHTML = '<i class="ti ti-check"></i> Simpan Perubahan';
+
+  // Scroll ke form
+  document.getElementById('phl-nama').scrollIntoView({behavior:'smooth', block:'center'});
+  document.getElementById('phl-nama').focus();
+}
+
+// Hapus PHL
+async function hapusPHL(id, nama){
+  if(!confirm(`Hapus data PHL "${nama}"?\nData ini tidak bisa dikembalikan.`)) return;
+
+  const tglKey = document.getElementById('phl-tgl').value;
+  const safeRes = await FB.getSafe('phl/'+tglKey);
+  if(!safeRes.ok){
+    toast('❌ Koneksi gagal — coba lagi','er');
+    return;
+  }
+  let list = Array.isArray(safeRes.data) ? safeRes.data : [];
+  list = list.filter(x => x.id !== id);
+
+  const ok = await FB.set('phl/'+tglKey, list);
+  if(!ok){ toast('❌ Gagal hapus','er'); return; }
+  toast('🗑 '+nama+' dihapus','ok');
+  pushNotif('admin','Hapus Rekap PHL',`🗑 PHL <b>${nama}</b> tanggal ${tglKey} dihapus`);
+  renderPHLList(list);
+}
+
+// Check-out 1 PHL — tandai status jadi checkedout & hitung jam otomatis
+async function checkoutPHL(id, nama){
+  if(!confirm(`Check-out PHL "${nama}" sekarang?\nPHL akan ditandai sudah selesai bekerja.\nTotal jam kerja dihitung otomatis dari waktu check-in.`)) return;
+
+  const tglKey = document.getElementById('phl-tgl').value;
+  const safeRes = await FB.getSafe('phl/'+tglKey);
+  if(!safeRes.ok){
+    toast('❌ Koneksi gagal — coba lagi','er');
+    return;
+  }
+  let list = Array.isArray(safeRes.data) ? safeRes.data : [];
+  const idx = list.findIndex(x=>x.id===id);
+  if(idx<0){ toast('❗ Data tidak ditemukan','er'); return; }
+
+  const now = Date.now();
+  list[idx].status = 'checkedout';
+  list[idx].checkoutMs = now;
+  // Hitung jam otomatis
+  const jamCalc = hitungJamPHL(list[idx].checkinMs || list[idx].ms, now);
+  list[idx].jam = jamCalc.jamDecimal;
+
+  const ok = await FB.set('phl/'+tglKey, list);
+  if(!ok){ toast('❌ Gagal check-out','er'); return; }
+  toast(`👋 ${nama} check-out · ${jamCalc.jamText}`,'ok');
+  pushNotif('admin','Check-out PHL',`✅ Check-out <b>${nama}</b> · ${jamCalc.jamText} · tanggal ${tglKey}`);
+  renderPHLList(list);
+}
+
+// Batalkan check-out (misal kalau salah klik)
+async function cancelCheckoutPHL(id, nama){
+  if(!confirm(`Batalkan check-out "${nama}"?\nStatus akan kembali ke "Sedang Bekerja".`)) return;
+
+  const tglKey = document.getElementById('phl-tgl').value;
+  const safeRes = await FB.getSafe('phl/'+tglKey);
+  if(!safeRes.ok){
+    toast('❌ Koneksi gagal — coba lagi','er');
+    return;
+  }
+  let list = Array.isArray(safeRes.data) ? safeRes.data : [];
+  const idx = list.findIndex(x=>x.id===id);
+  if(idx<0){ toast('❗ Data tidak ditemukan','er'); return; }
+
+  list[idx].status = 'checkedin';
+  list[idx].checkoutMs = null;
+  list[idx].jam = 0; // reset jam kembali ke 0 (belum checkout)
+
+  const ok = await FB.set('phl/'+tglKey, list);
+  if(!ok){ toast('❌ Gagal batal check-out','er'); return; }
+  toast('↩️ '+nama+' status dikembalikan','ok');
+  pushNotif('admin','Batal Check-out PHL',`↩️ Batal check-out <b>${nama}</b> tanggal ${tglKey}`);
+  renderPHLList(list);
+}
+
+// Check-out SEMUA PHL yang belum checkout — sekali klik
+async function checkoutSemuaPHL(){
+  const tglKey = document.getElementById('phl-tgl').value;
+  if(!tglKey){ toast('❗ Pilih tanggal dulu','er'); return; }
+
+  const safeRes = await FB.getSafe('phl/'+tglKey);
+  if(!safeRes.ok){
+    toast('❌ Koneksi gagal — coba lagi','er');
+    return;
+  }
+  let list = Array.isArray(safeRes.data) ? safeRes.data : [];
+
+  // Cari yang belum checkout
+  const pending = list.filter(x => x.status !== 'checkedout');
+  if(pending.length === 0){
+    toast('✅ Semua PHL sudah check-out','ok');
+    return;
+  }
+
+  if(!confirm(`Check-out SEMUA ${pending.length} PHL sekaligus?\n\n${pending.map(x=>'· '+x.nama).join('\n')}\n\nSemua akan ditandai sudah selesai bekerja.`)) return;
+
+  // Update semua yang belum checkout — hitung jam otomatis per record
+  const now = Date.now();
+  list = list.map(x => {
+    if(x.status !== 'checkedout'){
+      const jamCalc = hitungJamPHL(x.checkinMs || x.ms, now);
+      return { ...x, status: 'checkedout', checkoutMs: now, jam: jamCalc.jamDecimal };
+    }
+    return x;
+  });
+
+  const ok = await FB.set('phl/'+tglKey, list);
+  if(!ok){ toast('❌ Gagal check-out','er'); return; }
+  toast(`✅ ${pending.length} PHL berhasil check-out`,'ok');
+  pushNotif('admin','Check-out Semua PHL',`🚪 Check-out ${pending.length} PHL sekaligus tanggal ${tglKey}`);
+  renderPHLList(list);
+}
+
+// Export Excel Rekap PHL
+async function exportPHL(){
+  const tglKey = document.getElementById('phl-tgl').value;
+  if(!tglKey){ toast('❗ Pilih tanggal dulu','er'); return; }
+
+  const data = await FB.get('phl/'+tglKey);
+  const list = Array.isArray(data) ? data : [];
+  if(!list.length){ toast('❗ Tidak ada data untuk di-export','er'); return; }
+
+  const tglDisp = new Date(tglKey+'T00:00:00').toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const jmlL = list.filter(x=>x.gender==='L').length;
+  const jmlP = list.filter(x=>x.gender==='P').length;
+  const totalJam = list.reduce((s,x)=>{
+    if(x.status === 'checkedout' && x.checkoutMs){
+      const jc = hitungJamPHL(x.checkinMs || x.ms, x.checkoutMs);
+      return s + jc.jamDecimal;
+    }
+    return s;
+  }, 0);
+  const jmlPacker    = list.filter(x=>x.pekerjaan==='packer').length;
+  const jmlPicker    = list.filter(x=>x.pekerjaan==='picker').length;
+  const jmlBongkaran = list.filter(x=>x.pekerjaan==='bongkaran').length;
+
+  const jobLabel = {packer:'Packer', picker:'Picker', bongkaran:'Bongkaran'};
+
+  const rows = list.map((r,i)=>{
+    const statusLbl = r.status==='checkedout' ? 'Sudah Check-out' : 'Sedang Bekerja';
+    const statusColor = r.status==='checkedout' ? '#15803d' : '#a16207';
+    const checkinT = r.checkinMs ? new Date(r.checkinMs).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}) : '-';
+    const checkoutT = r.checkoutMs ? new Date(r.checkoutMs).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}) : '-';
+    // Jam otomatis dari selisih waktu
+    let jamKerjaText = 'masih bekerja';
+    if(r.status === 'checkedout' && r.checkoutMs){
+      jamKerjaText = hitungJamPHL(r.checkinMs || r.ms, r.checkoutMs).jamText;
+    }
+    return `<tr>
+      <td class="cn">${i+1}</td>
+      <td>${r.nama}</td>
+      <td class="cn">${r.gender==='L'?'Laki-laki':'Perempuan'}</td>
+      <td class="cn">${jobLabel[r.pekerjaan]||'-'}</td>
+      <td class="cn">${checkinT}</td>
+      <td class="cn">${checkoutT}</td>
+      <td class="cn">${jamKerjaText}</td>
+      <td class="cn" style="color:${statusColor};font-weight:bold">${statusLbl}</td>
+    </tr>`;
+  }).join('');
+
+  const jmlCheckout  = list.filter(x=>x.status==='checkedout').length;
+  const jmlPending   = list.length - jmlCheckout;
+  const totalJamRounded = Math.round(totalJam*100)/100;
+
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="UTF-8">
+<style>
+  table{border-collapse:collapse;font-family:Calibri,Arial;font-size:11pt}
+  th,td{border:1px solid #94a3b8;padding:6px 9px}
+  .title{font-size:16pt;font-weight:bold;color:#7c2d12;background:#fef3c7;text-align:center;padding:10px}
+  .sub{font-size:10pt;color:#7c2d12;background:#fde68a;text-align:center;padding:5px}
+  .hdr{background:#0ea5e9;color:#fff;font-weight:bold;text-align:center}
+  .cn{text-align:center}
+  .total{background:#fef3c7;font-weight:bold;color:#7c2d12}
+  .brk{background:#f0f9ff;font-size:10pt;color:#0369a1;text-align:center}
+</style></head><body>
+<table>
+  <tr><td colspan="8" class="title">📋 Rekap PHL Harian — GII-BOX</td></tr>
+  <tr><td colspan="8" class="sub">${tglDisp}</td></tr>
+  <tr><td colspan="8" class="brk">📦 ${jmlPacker} Packer · 🛒 ${jmlPicker} Picker · 🚚 ${jmlBongkaran} Bongkaran · ✅ ${jmlCheckout} sudah check-out · 🟢 ${jmlPending} masih bekerja</td></tr>
+  <tr class="hdr"><th>No</th><th>Nama Karyawan</th><th>Jenis Kelamin</th><th>Pekerjaan</th><th>Check-in</th><th>Check-out</th><th>Total Jam</th><th>Status</th></tr>
+  ${rows}
+  <tr class="total"><td colspan="6" style="text-align:right">TOTAL ${list.length} PHL (${jmlL}L, ${jmlP}P) — Total jam terakumulasi</td><td class="cn">${totalJamRounded} jam</td><td class="cn"></td></tr>
+</table>
+</body></html>`;
+
+  const blob = new Blob(['\uFEFF'+html], {type:'application/vnd.ms-excel'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'RekapPHL_'+tglKey+'.xls';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url); a.remove();}, 100);
+  toast('📊 Excel PHL berhasil diunduh','ok');
+}
+
 // ── DAFTAR AKUN BARU (Karyawan daftar mandiri) ─────────
 // Tampilkan halaman Daftar (full screen, mirip login)
 function showRegisterScreen(){
@@ -1584,6 +2190,9 @@ function initApp(){
   // Notif tab — HANYA untuk admin (karyawan tidak perlu lihat riwayat aktivitas admin)
   const nbNotif = document.getElementById('nb-notif');
   if(nbNotif) nbNotif.style.display = curUser.role==='admin' ? '' : 'none';
+  // Rekap PHL — hanya untuk admin
+  const nbPhl = document.getElementById('nb-rekapphl');
+  if(nbPhl) nbPhl.style.display = curUser.role==='admin' ? '' : 'none';
 
   // Default tab saat baru masuk: Admin → Dashboard, Karyawan → Absen
   if(curUser.role === 'admin'){
@@ -1669,6 +2278,7 @@ function gp(id,btn){
     if(id==='notif'){renderNotif();document.getElementById('ndot').style.display='none';}
     if(id==='admin'){renderAdminDash();renderEmpList();populateLapFilter();loadSetting();}
     if(id==='dashboard') renderDashboardStat();
+    if(id==='rekapphl' && typeof initRekapPHL==='function') initRekapPHL();
   } catch(e){console.error('Render error:',e);}
 }
 
@@ -3216,14 +3826,31 @@ async function lihatRiwayatKaryawan(uid, nama){
 
     // Simpan context untuk re-render saat filter berubah
     window._riwKryCtx = { uid, nama, list };
-    // Reset filter ke default (Harian)
-    document.querySelectorAll('.rw-filter-btn').forEach(b=>{
-      const isDefault = b.getAttribute('data-p') === '1';
-      b.classList.toggle('on', isDefault);
-      b.style.background = isDefault ? 'var(--bd)' : '#fff';
-      b.style.color = isDefault ? '#fff' : 'var(--bd)';
-      b.style.borderColor = isDefault ? 'var(--bd)' : 'var(--br)';
-    });
+
+    // Deteksi kondisi:
+    // - Pertama kali buka modal (belum ada filter aktif)
+    // - Ganti karyawan (uid berbeda dari sebelumnya) → reset ke Harian
+    // - Refresh setelah edit/hapus/tambah (uid sama) → keep filter aktif
+    const activeBtn = document.querySelector('.rw-filter-btn.on');
+    const uidLastOpen = window._riwKryLastUid;
+    const gantiKaryawan = uidLastOpen && uidLastOpen !== uid;
+    window._riwKryLastUid = uid;
+
+    let currentPeriode = '1'; // default
+    if(activeBtn && !gantiKaryawan){
+      // Refresh untuk karyawan yang sama — keep filter
+      currentPeriode = activeBtn.getAttribute('data-p');
+    } else {
+      // Pertama kali buka atau ganti karyawan — reset ke Harian
+      document.querySelectorAll('.rw-filter-btn').forEach(b=>{
+        const isDefault = b.getAttribute('data-p') === '1';
+        b.classList.toggle('on', isDefault);
+        b.style.background = isDefault ? 'var(--bd)' : '#fff';
+        b.style.color = isDefault ? '#fff' : 'var(--bd)';
+        b.style.borderColor = isDefault ? 'var(--bd)' : 'var(--br)';
+      });
+      currentPeriode = '1';
+    }
 
     // Tambahkan tombol "Tambah Absensi Manual"
     let addBtn = document.getElementById('riw-kry-add-btn');
@@ -3237,8 +3864,8 @@ async function lihatRiwayatKaryawan(uid, nama){
     }
     addBtn.onclick = ()=> tambahAbsensiManual(uid, nama);
 
-    // Render list dengan filter default 'Harian' (1 hari)
-    renderRiwayatKryList('1');
+    // Render list dengan filter aktif saat ini (kalau baru buka = Harian, kalau refresh = filter sebelumnya)
+    renderRiwayatKryList(currentPeriode);
     openMd('mdRiwayatKry');
   });
 }
@@ -3261,7 +3888,25 @@ function renderRiwayatKryList(periode){
   if(!ctx) return;
   const { uid, nama, list: fullList } = ctx;
 
-  // Filter berdasarkan periode
+  // Helper: get ms yang aman — kalau record lama tidak punya field 'ms', parse dari tgl+jam
+  const getMs = r => {
+    if(r.ms && r.ms > 0) return r.ms;
+    if(r.tgl && r.jam){
+      // Format tgl: "27/6/2026" atau "27-6-2026"
+      const parts = String(r.tgl).split(/[\/\-]/).map(Number);
+      if(parts.length === 3){
+        const [d, mo, y] = parts;
+        // Format jam: "08:53" atau "08.53" atau "8:5"
+        const jamParts = String(r.jam).split(/[.:]/).map(Number);
+        const h  = jamParts[0] || 0;
+        const mn = jamParts[1] || 0;
+        return new Date(y, mo-1, d, h, mn).getTime();
+      }
+    }
+    return 0;
+  };
+
+  // Filter berdasarkan periode — pakai getMs supaya record lama tanpa ms tetap masuk
   let list = fullList;
   if(periode !== 'all'){
     let cut;
@@ -3273,7 +3918,7 @@ function renderRiwayatKryList(periode){
       // Mingguan (7) atau Bulanan (30)
       cut = Date.now() - parseInt(periode)*86400000;
     }
-    list = fullList.filter(r=>(r.ms||0) >= cut);
+    list = fullList.filter(r=>getMs(r) >= cut);
   }
 
   const periodLabel = periode==='1' ? 'Hari Ini' :
@@ -3295,8 +3940,8 @@ function renderRiwayatKryList(periode){
   document.getElementById('riw-kry-summary').innerHTML =
     `📆 <b>${periodLabel}</b> · 📅 ${masukList.length} hari kerja · ⏰ ${fmtJam(totalJamAsli)} · ⚠️ ${terlambat} terlambat`;
 
-  // Urutkan terbaru di atas
-  const sorted = [...list].sort((a,b)=>(b.ms||0)-(a.ms||0));
+  // Urutkan terbaru di atas (pakai getMs supaya record lama juga aman)
+  const sorted = [...list].sort((a,b)=>getMs(b) - getMs(a));
 
   // Group by tanggal — 1 card per tanggal (masuk + keluar)
   const grpTgl = {};
@@ -3307,9 +3952,10 @@ function renderRiwayatKryList(periode){
     }
     // Index dalam list ASLI (fullList) — supaya edit/hapus tetap benar
     const origIdx = fullList.indexOf(r);
+    const rMs = getMs(r);
     if(r.tipe==='masuk'){ grpTgl[key].masuk = r; grpTgl[key].masukIdx = origIdx; }
     if(r.tipe==='keluar'){ grpTgl[key].keluar = r; grpTgl[key].keluarIdx = origIdx; }
-    if((r.ms||0) > grpTgl[key].ms) grpTgl[key].ms = r.ms||0;
+    if(rMs > grpTgl[key].ms) grpTgl[key].ms = rMs;
   });
   const grpList = Object.values(grpTgl).sort((a,b)=>b.ms - a.ms);
 
