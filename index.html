@@ -94,10 +94,16 @@ const FB = {
           try{ updateLoader('Mengirim Ulang', `Percobaan ${attempt}/${max} — mengunggah data...`); }catch(e){}
         }
       });
+      FB._lastError = null;
       console.log('✅ FB.set OK:', path);
       return true;
-    } catch(e){ console.warn('❌ FB.set ERROR:', path, e.message); return false; }
+    } catch(e){
+      FB._lastError = e.message;
+      console.warn('❌ FB.set ERROR:', path, e.message);
+      return false;
+    }
   },
+  _lastError: null,
   del: async (path) => {
     try { await xhr('DELETE', FB_BASE + '/' + path + '.json'); return true; }
     catch(e){ return false; }
@@ -1167,6 +1173,71 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
 'use strict';
 
 // ══════════════════════════════════════════════════════
+// GLOBAL ERROR HANDLER — deteksi crash silent
+// Tanpa ini, JS error di HP karyawan tertentu bikin app stuck tanpa feedback
+// ══════════════════════════════════════════════════════
+window.addEventListener('error', function(e){
+  console.error('❌ Global JS Error:', e.error || e.message, 'at', e.filename, ':', e.lineno);
+  try {
+    // Auto-hide loader kalau stuck
+    if(typeof hideLoader === 'function') hideLoader();
+    // Beritahu user ada error
+    if(typeof toast === 'function'){
+      toast('⚠️ Terjadi error: '+(e.message||'unknown')+' (F12 untuk detail)','er');
+    } else {
+      // Toast belum siap → pakai alert simple
+      const msg = (e.message||'unknown error').substring(0,100);
+      console.warn('Toast not ready, error:', msg);
+    }
+  } catch(ex){}
+});
+
+window.addEventListener('unhandledrejection', function(e){
+  console.error('❌ Unhandled Promise Rejection:', e.reason);
+  try {
+    if(typeof hideLoader === 'function') hideLoader();
+    if(typeof toast === 'function'){
+      const msg = (e.reason && e.reason.message) ? e.reason.message : String(e.reason).substring(0,100);
+      toast('⚠️ Operasi gagal: '+msg,'er');
+    }
+  } catch(ex){}
+});
+
+// ══════════════════════════════════════════════════════
+// OFFLINE DETECTION — beri tahu user kalau internet putus
+// ══════════════════════════════════════════════════════
+window.addEventListener('online', function(){
+  console.log('🟢 Kembali online');
+  try {
+    if(typeof toast === 'function') toast('🟢 Internet kembali tersambung','ok');
+    // Auto-hide banner offline kalau ada
+    const banner = document.getElementById('offline-banner');
+    if(banner) banner.style.display = 'none';
+  } catch(e){}
+});
+window.addEventListener('offline', function(){
+  console.warn('🔴 Offline');
+  try {
+    if(typeof toast === 'function') toast('🔴 Internet terputus — tunggu sebentar','warn');
+    // Show banner offline supaya user tahu jelas
+    let banner = document.getElementById('offline-banner');
+    if(!banner){
+      banner = document.createElement('div');
+      banner.id = 'offline-banner';
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#dc2626;color:#fff;padding:8px 12px;text-align:center;font-size:12px;font-weight:700;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+      banner.innerHTML = '📡 <b>Tidak ada koneksi internet</b> — data tidak akan tersimpan sampai online';
+      document.body.appendChild(banner);
+    } else {
+      banner.style.display = '';
+    }
+  } catch(e){}
+});
+// Cek status awal
+if(typeof navigator !== 'undefined' && !navigator.onLine){
+  setTimeout(()=>{ try { window.dispatchEvent(new Event('offline')); } catch(e){} }, 1000);
+}
+
+// ══════════════════════════════════════════════════════
 // FIREBASE CONFIG
 // ══════════════════════════════════════════════════════
 const FIREBASE_CONFIG = {
@@ -1664,6 +1735,7 @@ function hitungJamPHL(checkinMs, checkoutMs){
 
 // Tambah PHL baru ke tanggal terpilih
 async function tambahPHL(){
+  try {
   const tglInput = document.getElementById('phl-tgl');
   const namaInput = document.getElementById('phl-nama');
   const gL = document.getElementById('phl-gender-L');
@@ -1705,7 +1777,12 @@ async function tambahPHL(){
       list[idx].updatedAt = Date.now();
     }
     const ok = await FB.set('phl/'+tglKey, list);
-    if(!ok){ toast('❌ Gagal simpan — coba lagi','er'); return; }
+    if(!ok){
+      const errMsg = FB._lastError || 'unknown';
+      toast('❌ Gagal simpan: '+errMsg,'er');
+      alert('⚠️ Gagal simpan\n\nError: '+errMsg+'\n\nCoba lagi setelah internet stabil.');
+      return;
+    }
     toast('✅ Data '+nama+' diperbarui','ok');
     pushNotif('admin','Edit Rekap PHL',`📝 Data PHL <b>${nama}</b> (${pekerjaan}) tanggal ${tglKey} diperbarui`);
     phlEditingId = null;
@@ -1726,7 +1803,32 @@ async function tambahPHL(){
     };
     list.unshift(rec);
     const ok = await FB.set('phl/'+tglKey, list);
-    if(!ok){ toast('❌ Gagal simpan — coba lagi','er'); return; }
+    if(!ok){
+      const errMsg = FB._lastError || 'unknown';
+      toast('❌ Gagal simpan: '+errMsg,'er');
+      // Kalau permission denied → kasih panduan update Firebase rules
+      if(errMsg.toLowerCase().includes('permission') || errMsg.toLowerCase().includes('401') || errMsg.toLowerCase().includes('403')){
+        alert('⚠️ FIREBASE PERMISSION DENIED\n\n'+
+              'Error: '+errMsg+'\n\n'+
+              'Firebase Rules belum izinkan write ke path "/owl/phl".\n\n'+
+              'SOLUSI:\n'+
+              '1. Buka Firebase Console: console.firebase.google.com\n'+
+              '2. Pilih project "owl-absensi"\n'+
+              '3. Menu Realtime Database → Tab Rules\n'+
+              '4. Ganti rules jadi:\n\n'+
+              '{\n  "rules": {\n    ".read": true,\n    ".write": true\n  }\n}\n\n'+
+              '5. Klik Publish\n'+
+              '6. Coba check-in ulang.');
+      } else {
+        alert('⚠️ Gagal simpan ke Firebase\n\n'+
+              'Error: '+errMsg+'\n\n'+
+              'Kemungkinan:\n'+
+              '1. Koneksi internet lambat/putus\n'+
+              '2. Firebase server sedang bermasalah\n\n'+
+              'Coba lagi setelah internet stabil.');
+      }
+      return;
+    }
     const jamCheckin = new Date(now).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
     toast('✅ '+nama+' Check-in '+jamCheckin,'ok');
     pushNotif('admin','Check-in PHL',`➕ Check-in <b>${nama}</b> (${gender==='L'?'L':'P'}, ${pekerjaan}) jam ${jamCheckin} tanggal ${tglKey}`);
@@ -1744,6 +1846,12 @@ async function tambahPHL(){
   namaInput.focus();
 
   renderPHLList(list);
+
+  } catch(err){
+    console.error('❌ Error tambahPHL:', err);
+    toast('❌ Error tak terduga: '+(err.message||'unknown'),'er');
+    alert('⚠️ Terjadi error saat check-in PHL\n\nError: '+(err.message||'unknown')+'\n\nCoba refresh halaman.');
+  }
 }
 
 // Edit PHL — isi form dengan data existing
@@ -1787,7 +1895,10 @@ async function hapusPHL(id, nama){
   list = list.filter(x => x.id !== id);
 
   const ok = await FB.set('phl/'+tglKey, list);
-  if(!ok){ toast('❌ Gagal hapus','er'); return; }
+  if(!ok){
+    toast('❌ Gagal hapus: '+(FB._lastError||'unknown'),'er');
+    return;
+  }
   toast('🗑 '+nama+' dihapus','ok');
   pushNotif('admin','Hapus Rekap PHL',`🗑 PHL <b>${nama}</b> tanggal ${tglKey} dihapus`);
   renderPHLList(list);
@@ -1815,7 +1926,10 @@ async function checkoutPHL(id, nama){
   list[idx].jam = jamCalc.jamDecimal;
 
   const ok = await FB.set('phl/'+tglKey, list);
-  if(!ok){ toast('❌ Gagal check-out','er'); return; }
+  if(!ok){
+    toast('❌ Gagal check-out: '+(FB._lastError||'unknown'),'er');
+    return;
+  }
   toast(`👋 ${nama} check-out · ${jamCalc.jamText}`,'ok');
   pushNotif('admin','Check-out PHL',`✅ Check-out <b>${nama}</b> · ${jamCalc.jamText} · tanggal ${tglKey}`);
   renderPHLList(list);
@@ -1840,7 +1954,10 @@ async function cancelCheckoutPHL(id, nama){
   list[idx].jam = 0; // reset jam kembali ke 0 (belum checkout)
 
   const ok = await FB.set('phl/'+tglKey, list);
-  if(!ok){ toast('❌ Gagal batal check-out','er'); return; }
+  if(!ok){
+    toast('❌ Gagal batal: '+(FB._lastError||'unknown'),'er');
+    return;
+  }
   toast('↩️ '+nama+' status dikembalikan','ok');
   pushNotif('admin','Batal Check-out PHL',`↩️ Batal check-out <b>${nama}</b> tanggal ${tglKey}`);
   renderPHLList(list);
@@ -1878,7 +1995,10 @@ async function checkoutSemuaPHL(){
   });
 
   const ok = await FB.set('phl/'+tglKey, list);
-  if(!ok){ toast('❌ Gagal check-out','er'); return; }
+  if(!ok){
+    toast('❌ Gagal check-out semua: '+(FB._lastError||'unknown'),'er');
+    return;
+  }
   toast(`✅ ${pending.length} PHL berhasil check-out`,'ok');
   pushNotif('admin','Check-out Semua PHL',`🚪 Check-out ${pending.length} PHL sekaligus tanggal ${tglKey}`);
   renderPHLList(list);
@@ -2631,6 +2751,7 @@ function inputLokasiManual(){
 
 // ── ABSEN ─────────────────────────────────────────────
 function doAbsen(tipe){
+  try {
   // Foto sekarang opsional — kalau tidak ada, tetap bisa absen (dengan warning)
   if(!fotoData){
     // Tanpa foto — set ke string kosong, tetap bisa lanjut
@@ -2706,12 +2827,24 @@ function doAbsen(tipe){
     '<strong>Koordinat:</strong> <a href="'+mapsUrl+'" target="_blank" style="color:#0ea5e9;font-weight:700">'+lokasiData.lat+', '+lokasiData.lon+' 🗺️</a>'+
     lokasiKantorInfo+iInfo;
   openMd('mdAbsen');
+  } catch(err){
+    console.error('❌ Error doAbsen:', err);
+    toast('❌ Gagal buka konfirmasi absen: '+(err.message||'error'),'er');
+    alert('⚠️ Gagal buka konfirmasi absen\n\nError: '+(err.message||'unknown')+'\n\nCoba refresh halaman. Kalau tetap error, screenshot ke admin.');
+  }
 }
 
 function openMd(id){document.getElementById(id).classList.add('on');}
 function closeMd(id){document.getElementById(id).classList.remove('on');}
 
 async function konfirmasi(){
+  // Guard: prevent double-click / double-submit
+  if(window._absenSubmitting){
+    console.warn('Absen sedang diproses, abaikan klik kedua');
+    return;
+  }
+  window._absenSubmitting = true;
+
   closeMd('mdAbsen');
   const n=new Date(),j=n.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
   const today=n.toLocaleDateString('id-ID');
@@ -2719,6 +2852,8 @@ async function konfirmasi(){
 
   showLoader('Menyimpan Absen','Menghubungkan ke server...');
 
+  // Wrap semua logic dalam try — kalau ada JS error, loader tetap hide di finally
+  try {
   // Ambil list TERBARU dari Firebase — FB.getSafe sudah retry 3x
   const safeRes = await FB.getSafe('absensi/'+curUser.username);
   if(!safeRes.ok){
@@ -2840,6 +2975,18 @@ async function konfirmasi(){
   stopCam(true);
   calcGaji();
   if(typeof updateAbsenModeUI==='function') updateAbsenModeUI();
+
+  } catch(err){
+    // Kalau ada JS error di tengah konfirmasi (misal fungsi tidak ada, data corrupt)
+    console.error('❌ Error konfirmasi:', err);
+    toast('❌ Absen gagal: '+(err.message||'error tidak terduga'),'er');
+    alert('⚠️ Absen tidak berhasil disimpan\n\nError: '+(err.message||'unknown')+'\n\nCoba refresh halaman & absen ulang. Data lama Anda aman.');
+  } finally {
+    // WAJIB: hide loader di finally supaya tidak stuck kalau error
+    hideLoader();
+    // Reset guard supaya user bisa coba lagi
+    window._absenSubmitting = false;
+  }
 }
 
 // ── RIWAYAT ───────────────────────────────────────────
