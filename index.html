@@ -446,6 +446,10 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
     </div>
     <button class="btn btn-b" onclick="doLogin()" style="margin-top:4px"><i class="ti ti-login"></i> Masuk</button>
 
+    <div style="text-align:center;margin-top:8px;padding:7px 10px;background:#f0fdf4;border:1px dashed #86efac;border-radius:8px;font-size:10px;color:#15803d">
+      🔒 <b>Tetap Login 30 Hari</b> — tidak perlu login ulang setiap buka aplikasi
+    </div>
+
     <!-- Link Daftar Akun Baru -->
     <div style="text-align:center;margin-top:12px;padding:10px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px dashed var(--bd);border-radius:10px">
       <div style="font-size:11px;color:var(--mt);margin-bottom:6px">Belum punya akun?</div>
@@ -546,14 +550,31 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
       <div class="st-box"><div class="sl">⏱ Durasi</div><div class="sv" id="s-dur" style="font-size:12px">0j 0m</div></div>
     </div>
 
-    <!-- Mode indicator -->
-    <div id="absenModeInfo" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);border:2px solid #15803d;border-radius:14px;padding:12px;text-align:center;margin:6px 0">
-      <div style="font-size:10px;color:#15803d;font-weight:600;margin-bottom:4px">📸 MODE OTOMATIS</div>
-      <div id="absenModeText" style="font-size:15px;font-weight:800;color:#166534">Ambil foto = Absen Masuk</div>
-      <div id="absenModeHint" style="font-size:10px;color:#15803d;margin-top:4px;line-height:1.4">Foto saja — sistem otomatis catat absen masuk</div>
+    <!-- PILIH MODE ABSEN (Masuk / Keluar) -->
+    <div id="absen-mode-picker" style="margin:6px 0">
+      <div style="font-size:11px;color:var(--mt);font-weight:700;text-align:center;margin-bottom:8px">👇 Pilih Jenis Absen</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button id="btn-mode-masuk" onclick="pilihModeAbsen('masuk')" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none;border-radius:14px;padding:18px 12px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(22,163,74,.3);display:flex;flex-direction:column;align-items:center;gap:6px;transition:all .2s">
+          <div style="font-size:32px;line-height:1">⬆️</div>
+          <div style="font-size:14px">Absen MASUK</div>
+          <div id="status-masuk" style="font-size:10px;opacity:.9;font-weight:600">Klik untuk mulai</div>
+        </button>
+        <button id="btn-mode-keluar" onclick="pilihModeAbsen('keluar')" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border:none;border-radius:14px;padding:18px 12px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(220,38,38,.3);display:flex;flex-direction:column;align-items:center;gap:6px;transition:all .2s">
+          <div style="font-size:32px;line-height:1">⬇️</div>
+          <div style="font-size:14px">Absen KELUAR</div>
+          <div id="status-keluar" style="font-size:10px;opacity:.9;font-weight:600">Klik untuk mulai</div>
+        </button>
+      </div>
     </div>
 
-    <div class="cam-box" id="camBox" onclick="startCam()">
+    <!-- Banner mode aktif (muncul setelah pilih tombol) -->
+    <div id="absenModeInfo" style="display:none;background:linear-gradient(135deg,#dcfce7,#bbf7d0);border:2px solid #15803d;border-radius:14px;padding:10px 12px;margin:6px 0;position:relative">
+      <button onclick="batalPilihMode()" style="position:absolute;top:6px;right:6px;background:rgba(255,255,255,.7);border:none;border-radius:6px;padding:3px 7px;font-size:10px;font-weight:700;cursor:pointer;color:var(--mt)">✕ Batal</button>
+      <div id="absenModeText" style="font-size:14px;font-weight:800;color:#166534;text-align:center">📸 Silakan foto untuk Absen Masuk</div>
+      <div id="absenModeHint" style="font-size:10px;color:#15803d;margin-top:3px;line-height:1.4;text-align:center">Ambil foto → lokasi & foto akan disimpan sebagai absen masuk</div>
+    </div>
+
+    <div class="cam-box" id="camBox" onclick="startCam()" style="display:none">
       <video id="vid" autoplay playsinline muted></video>
       <canvas id="cvs"></canvas>
       <div class="cam-ph" id="camPh"><i class="ti ti-camera"></i><p>📷 Mengaktifkan kamera...</p></div>
@@ -1085,6 +1106,17 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
         <button class="btn btn-w" onclick="exportBackup()"><i class="ti ti-download"></i> Download Backup Sekarang</button>
         <button class="btn btn-w" onclick="document.getElementById('import-file').click()"><i class="ti ti-upload"></i> Import Backup Data</button>
         <input type="file" id="import-file" accept=".json" style="display:none" onchange="doImport(event)">
+
+        <div style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);border:1px solid #60a5fa;border-radius:11px;padding:12px;margin-top:14px">
+          <div style="font-size:12px;font-weight:800;color:#1e40af;margin-bottom:6px">🧹 AUTO-CLEANUP FOTO (Otomatis)</div>
+          <div style="font-size:11px;color:#1e3a8a;line-height:1.5;margin-bottom:10px">
+            Sistem otomatis menghapus <b>foto absen > 30 hari (1 bulan)</b> setiap hari saat admin login. Metadata absen (jam, tanggal, lokasi, durasi, gaji) <b>tetap disimpan selamanya</b>.
+            <br><br>
+            Ini bikin sistem tetap responsif meski karyawan sudah bekerja bertahun-tahun.
+          </div>
+          <button onclick="kompresDataKaryawan()" style="width:100%;background:linear-gradient(90deg,#f59e0b,#f97316);color:#fff;border:none;border-radius:9px;padding:10px 14px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 6px rgba(249,115,22,.3)"><i class="ti ti-zap"></i> Jalankan Sekarang (Manual)</button>
+        </div>
+
         <button class="btn" style="background:#fee2e2;color:#dc2626;margin-top:4px" onclick="resetData()"><i class="ti ti-trash"></i> Reset Semua Data</button>
       </div>
     </div>
@@ -1238,6 +1270,290 @@ if(typeof navigator !== 'undefined' && !navigator.onLine){
 }
 
 // ══════════════════════════════════════════════════════
+// OFFLINE QUEUE — simpan absen yang gagal upload
+// Auto-sync saat online. Data karyawan tidak akan hilang meski
+// sinyal jelek atau Firebase timeout.
+// ══════════════════════════════════════════════════════
+const PendingQueue = {
+  // Baca queue dari localStorage
+  getAll: () => {
+    try { return JSON.parse(localStorage.getItem('owl_pending')||'[]'); } catch(e){ return []; }
+  },
+  // Simpan queue
+  save: (arr) => {
+    try { localStorage.setItem('owl_pending', JSON.stringify(arr)); } catch(e){ console.warn('LS full:', e.message); }
+  },
+  // Tambah pending record baru
+  add: (uid, tipe, record) => {
+    const q = PendingQueue.getAll();
+    q.push({ uid, tipe, record, ts: Date.now(), tries: 0 });
+    PendingQueue.save(q);
+    PendingQueue.updateBanner();
+    console.log('📥 Pending queue +1, total:', q.length);
+  },
+  // Hitung
+  count: () => PendingQueue.getAll().length,
+  // Update banner "N pending"
+  updateBanner: () => {
+    const count = PendingQueue.count();
+    let banner = document.getElementById('pending-banner');
+    if(count === 0){
+      if(banner) banner.style.display = 'none';
+      return;
+    }
+    if(!banner){
+      banner = document.createElement('div');
+      banner.id = 'pending-banner';
+      banner.style.cssText = 'position:fixed;bottom:12px;left:12px;right:12px;background:linear-gradient(90deg,#f59e0b,#f97316);color:#fff;padding:10px 14px;border-radius:10px;font-size:12px;font-weight:700;z-index:9998;box-shadow:0 4px 12px rgba(249,115,22,.4);display:flex;align-items:center;justify-content:space-between;gap:8px';
+      banner.innerHTML = `
+        <span>⏳ <span id="pending-count">${count}</span> absen menunggu sync</span>
+        <button onclick="syncPendingNow()" style="background:#fff;color:#c2410c;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:800;cursor:pointer">🔄 Sync Sekarang</button>
+      `;
+      document.body.appendChild(banner);
+    } else {
+      const c = document.getElementById('pending-count');
+      if(c) c.textContent = count;
+      banner.style.display = '';
+    }
+  },
+  // Sync semua pending ke Firebase — coba upload ulang
+  sync: async () => {
+    const q = PendingQueue.getAll();
+    if(q.length === 0) return { synced: 0, failed: 0 };
+    console.log('🔄 Syncing', q.length, 'pending records...');
+    let synced = 0, failed = 0;
+    const remaining = [];
+
+    // Group by uid supaya efisien (1 kali GET per user)
+    const byUid = {};
+    q.forEach(p => { if(!byUid[p.uid]) byUid[p.uid] = []; byUid[p.uid].push(p); });
+
+    for(const uid of Object.keys(byUid)){
+      const pendings = byUid[uid];
+      // Ambil list terbaru dari FB
+      const safe = await FB.getSafe('absensi/'+uid);
+      if(!safe.ok){
+        // Firebase masih tidak jangkau — keep semua pending user ini
+        pendings.forEach(p => { p.tries++; remaining.push(p); });
+        failed += pendings.length;
+        continue;
+      }
+      let list = Array.isArray(safe.data) ? safe.data : [];
+
+      // Cek duplikat: jangan tambah kalau sudah ada record sama (tipe+tgl)
+      pendings.forEach(p => {
+        const existing = list.find(r => r.tipe === p.record.tipe && r.tgl === p.record.tgl);
+        if(!existing){
+          list.unshift(p.record);
+        } else {
+          console.log(`  ⏭  Skip ${uid} ${p.record.tipe} ${p.record.tgl} — sudah ada`);
+        }
+      });
+
+      // Trim + upload
+      const trim = trimOldPhotos(list, 30);
+      const ok = await FB.set('absensi/'+uid, trim.list);
+      if(ok){
+        synced += pendings.length;
+        console.log(`  ✅ ${uid}: sync ${pendings.length} record`);
+      } else {
+        pendings.forEach(p => { p.tries++; remaining.push(p); });
+        failed += pendings.length;
+      }
+    }
+
+    PendingQueue.save(remaining);
+    PendingQueue.updateBanner();
+    return { synced, failed };
+  }
+};
+
+// Sync manual dipanggil dari banner button
+async function syncPendingNow(){
+  if(!navigator.onLine){ toast('🔴 Masih offline — coba lagi saat online','warn'); return; }
+  toast('🔄 Sync sedang berjalan...','');
+  const res = await PendingQueue.sync();
+  if(res.synced > 0) toast(`✅ ${res.synced} absen berhasil di-sync!`,'ok');
+  if(res.failed > 0) toast(`⚠️ ${res.failed} masih gagal — akan dicoba lagi otomatis`,'warn');
+  if(res.synced === 0 && res.failed === 0) toast('Tidak ada pending','ok');
+}
+
+// Auto-sync setiap 60 detik saat online
+setInterval(() => {
+  if(navigator.onLine && PendingQueue.count() > 0){
+    PendingQueue.sync().then(res => {
+      if(res.synced > 0) console.log(`Auto-sync: ${res.synced} berhasil`);
+    });
+  }
+}, 60000);
+
+// Sync saat online kembali
+window.addEventListener('online', () => {
+  if(PendingQueue.count() > 0){
+    setTimeout(() => syncPendingNow(), 2000);
+  }
+});
+
+// Update banner saat page load
+setTimeout(() => PendingQueue.updateBanner(), 3000);
+
+// ══════════════════════════════════════════════════════
+// AUTO-TRIM FOTO LAMA — Optimasi untuk karyawan lama
+// Menghapus foto base64 dari record > 30 hari (1 bulan)
+// Metadata absen (jam, tanggal, lokasi, durasi, gaji) TETAP disimpan selamanya
+// Ini yang bikin sistem tetap ringan meski karyawan sudah bekerja bertahun-tahun
+// ══════════════════════════════════════════════════════
+function trimOldPhotos(list, keepDays = 30){
+  if(!Array.isArray(list) || list.length === 0) return {list, trimmed: 0, savedBytes: 0};
+  const cut = Date.now() - (keepDays * 86400000);
+  let trimmed = 0;
+  let savedBytes = 0;
+  const cleaned = list.map(r => {
+    // Kalau record punya foto dan lebih tua dari cut → drop fotonya
+    const rMs = r.ms || (r.tgl && r.jam ? (() => {
+      try {
+        const [d,mo,y] = String(r.tgl).split(/[\/\-]/).map(Number);
+        const [h,mn] = String(r.jam||'0:0').split(/[.:]/).map(Number);
+        return new Date(y,mo-1,d,h||0,mn||0).getTime();
+      } catch(e) { return 0; }
+    })() : 0);
+    if(r.foto && r.foto.length > 100 && rMs > 0 && rMs < cut){
+      savedBytes += r.foto.length;
+      trimmed++;
+      return { ...r, foto: '', fotoTrimmed: true };
+    }
+    return r;
+  });
+  return { list: cleaned, trimmed, savedBytes };
+}
+
+// Manual: kompres data foto lama untuk SEMUA karyawan sekaligus
+// Dipanggil dari tombol admin setting
+async function kompresDataKaryawan(){
+  if(!confirm('⚡ Optimasi Semua Karyawan\n\n'+
+              'Akan menghapus foto absen yang lebih dari 30 hari (1 bulan) dari SEMUA karyawan.\n'+
+              'Metadata absen (jam, tanggal, lokasi, durasi, gaji) TETAP AMAN.\n\n'+
+              'Efek: absen karyawan lama (HANES, dll) akan jauh lebih cepat.\n\n'+
+              'Lanjutkan?')) return;
+
+  showLoader('Optimasi Data','Mengambil data semua karyawan...');
+  try {
+    const allAbsensi = await FB.get('absensi');
+    if(!allAbsensi){
+      hideLoader();
+      toast('Tidak ada data absensi','warn');
+      return;
+    }
+
+    const usernames = Object.keys(allAbsensi);
+    let totalTrimmed = 0;
+    let totalSaved = 0;
+    let usersOptimized = 0;
+
+    for(let i=0; i<usernames.length; i++){
+      const uid = usernames[i];
+      const list = Array.isArray(allAbsensi[uid]) ? allAbsensi[uid] : [];
+      if(list.length === 0) continue;
+
+      updateLoader('Optimasi Data', `Memproses ${uid} (${i+1}/${usernames.length})...`);
+
+      const res = trimOldPhotos(list, 30);
+      if(res.trimmed > 0){
+        // Upload hasil trim ke Firebase
+        const ok = await FB.set('absensi/'+uid, res.list);
+        if(ok){
+          totalTrimmed += res.trimmed;
+          totalSaved += res.savedBytes;
+          usersOptimized++;
+          console.log(`✅ ${uid}: trim ${res.trimmed} foto, hemat ${(res.savedBytes/1024/1024).toFixed(1)}MB`);
+        }
+      }
+    }
+
+    hideLoader();
+    const savedMB = (totalSaved/1024/1024).toFixed(1);
+    if(totalTrimmed > 0){
+      alert(`✅ OPTIMASI SELESAI!\n\n`+
+            `📊 Statistik:\n`+
+            `• Karyawan dioptimasi: ${usersOptimized} dari ${usernames.length}\n`+
+            `• Foto lama dihapus: ${totalTrimmed}\n`+
+            `• Data dihemat: ${savedMB} MB\n\n`+
+            `Absen karyawan sekarang akan jauh lebih cepat! ⚡`);
+      pushNotif('admin','Optimasi Data',`⚡ Optimasi selesai: hemat ${savedMB}MB dari ${totalTrimmed} foto (${usersOptimized} karyawan)`);
+      toast(`⚡ Optimasi selesai — hemat ${savedMB}MB`,'ok');
+    } else {
+      toast('✅ Semua data sudah optimal — tidak ada yang perlu dikompres','ok');
+    }
+  } catch(err){
+    hideLoader();
+    console.error('Error kompres:', err);
+    toast('❌ Gagal optimasi: '+err.message,'er');
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// AUTO-CLEANUP SCHEDULER
+// Jalan otomatis 1x sehari saat admin login untuk cleanup foto > 60 hari
+// Karyawan biasa tidak trigger ini (biar tidak berat di HP mereka)
+// ══════════════════════════════════════════════════════
+async function autoCleanupHarian(){
+  if(!curUser || curUser.role !== 'admin') return;
+
+  const LAST_CLEANUP_KEY = 'owl_lastCleanup';
+  const CLEANUP_INTERVAL = 24 * 3600 * 1000; // 24 jam
+  const lastCleanup = parseInt(localStorage.getItem(LAST_CLEANUP_KEY) || '0');
+  const now = Date.now();
+
+  if(now - lastCleanup < CLEANUP_INTERVAL){
+    const jamLagi = Math.ceil((CLEANUP_INTERVAL - (now - lastCleanup)) / 3600000);
+    console.log(`⏭  Auto-cleanup: sudah dijalankan ${Math.floor((now-lastCleanup)/3600000)}j lalu, next dalam ${jamLagi}j`);
+    return;
+  }
+
+  console.log('🧹 Auto-cleanup harian: mulai...');
+  try {
+    // Set marker DULU supaya kalau gagal di tengah, tidak infinite loop
+    localStorage.setItem(LAST_CLEANUP_KEY, String(now));
+
+    const allAbsensi = await FB.get('absensi');
+    if(!allAbsensi) return;
+
+    const usernames = Object.keys(allAbsensi);
+    let totalTrimmed = 0;
+    let totalSaved = 0;
+    let usersOptimized = 0;
+
+    for(const uid of usernames){
+      const list = Array.isArray(allAbsensi[uid]) ? allAbsensi[uid] : [];
+      if(list.length === 0) continue;
+
+      const res = trimOldPhotos(list, 30);
+      if(res.trimmed > 0){
+        const ok = await FB.set('absensi/'+uid, res.list);
+        if(ok){
+          totalTrimmed += res.trimmed;
+          totalSaved += res.savedBytes;
+          usersOptimized++;
+        }
+      }
+    }
+
+    if(totalTrimmed > 0){
+      const savedMB = (totalSaved/1024/1024).toFixed(1);
+      console.log(`✅ Auto-cleanup selesai: hemat ${savedMB}MB dari ${totalTrimmed} foto (${usersOptimized} karyawan)`);
+      // Notif ke admin (silent, tidak intrusive)
+      pushNotif('admin','Auto-Cleanup Harian',`🧹 Otomatis hemat ${savedMB}MB dari ${totalTrimmed} foto lama > 30 hari (${usersOptimized} karyawan)`);
+    } else {
+      console.log('✅ Auto-cleanup: semua data sudah optimal');
+    }
+  } catch(err){
+    console.warn('Auto-cleanup error:', err.message);
+    // Reset marker supaya besok bisa coba lagi
+    localStorage.setItem(LAST_CLEANUP_KEY, String(now - 20*3600*1000));
+  }
+}
+
+// ══════════════════════════════════════════════════════
 // FIREBASE CONFIG
 // ══════════════════════════════════════════════════════
 const FIREBASE_CONFIG = {
@@ -1275,13 +1591,37 @@ const DB = {
 async function initData(){
   showLoading('Menghubungkan ke server...');
   try {
-    const data = await FB.get('');
-    if(data){
-      Object.keys(data).forEach(k => DB.setLocal(k, data[k]));
-      if(!data.initialized) await initDataBaru();
-    } else {
+    // OPTIMASI: Fetch HANYA data ringan yang wajib untuk login
+    // (users + config = ~10 KB). Data absensi/notifs/phl di-fetch on-demand
+    // saat tab dibuka — mencegah download 50-100 MB saat login.
+    console.log('🚀 Fetch data login ringan...');
+    const t0 = Date.now();
+    const [users, config] = await Promise.all([
+      FB.get('users'),
+      FB.get('config')
+    ]);
+    console.log(`✅ Fetch selesai dalam ${Date.now()-t0}ms`);
+
+    if(users) DB.setLocal('users', users);
+    if(config) DB.setLocal('config', config);
+
+    // Kalau users kosong → sistem baru, buat data default
+    if(!users || Object.keys(users).length === 0){
       await initDataBaru();
+    } else {
+      DB.setLocal('initialized', true);
     }
+
+    // Load data lain SILENT di background (tidak block login)
+    // Notifs & absensi di-fetch saat tab-nya dibuka
+    setTimeout(async () => {
+      try {
+        console.log('🔄 Background load: notifs...');
+        const notifs = await FB.get('notifs');
+        if(notifs) DB.setLocal('notifs', notifs);
+      } catch(e){ console.warn('Background load notifs fail:', e.message); }
+    }, 100);
+
   } catch(e) {
     console.warn('initData error:', e);
     initDataLokal();
@@ -1375,6 +1715,22 @@ const getUsers    = () => DB.get('users')   || {};
 const getCfg      = () => DB.get('config')  || {tarifJam:12500,gajiStandar:90000,jamStandar:8,gajiStandar2:100000,jamStandar2:9,jamMasuk:'09:00',jamKeluar:'17:00',perusahaan:'Perusahaan Anda',alamat:''};
 const getNotifs   = () => DB.get('notifs')  || [];
 const getAllAbsensi= () => DB.get('absensi') || {};
+
+// Fetch absensi dari Firebase kalau belum ada di localStorage
+// Panggil dari tab yang butuh data absensi (Riwayat, Dashboard, dll)
+async function ensureAbsensiLoaded(force=false){
+  const cached = DB.get('absensi');
+  if(cached && Object.keys(cached).length > 0 && !force){
+    return cached; // sudah ada di cache
+  }
+  console.log('📥 Fetch absensi dari Firebase (on-demand)...');
+  const data = await FB.get('absensi');
+  if(data){
+    DB.setLocal('absensi', data);
+    return data;
+  }
+  return {};
+}
 const getUserAbs  = uid => (getAllAbsensi()[uid]) || [];
 
 // ── HELPER: Pembulatan jam ke kelipatan 0.5 (setengah jam) ──
@@ -2321,8 +2677,16 @@ function initApp(){
     if(nbDash) nbDash.classList.add('on');
     const pgDash = document.getElementById('pg-dashboard');
     if(pgDash) pgDash.classList.add('on');
-    // Load data dashboard
-    setTimeout(()=>{ try{ renderDashboardStat(); }catch(e){console.error(e);} }, 100);
+    // Load data dashboard (fetch absensi on-demand, tidak block UI)
+    setTimeout(()=>{
+      ensureAbsensiLoaded().then(()=>{
+        try{ renderDashboardStat(); }catch(e){console.error(e);}
+      });
+    }, 100);
+    // Auto-cleanup foto > 60 hari (1x sehari, silent di background)
+    setTimeout(()=>{
+      try{ autoCleanupHarian(); }catch(e){console.error(e);}
+    }, 5000);
   } else {
     // Karyawan: default ke Absen
     document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
@@ -2331,12 +2695,20 @@ function initApp(){
     if(nbAbsen) nbAbsen.classList.add('on');
     const pgAbsen = document.getElementById('pg-absen');
     if(pgAbsen) pgAbsen.classList.add('on');
-    // Auto-jalankan: status check, GPS deteksi, dan aktifkan kamera (tanpa perlu user klik)
+    // Karyawan cuma butuh /absensi/{username} — jauh lebih ringan dari fetch all
+    setTimeout(async () => {
+      try {
+        // Fetch HANYA data absensi karyawan ini (bukan semua karyawan)
+        const myAbs = await FB.get('absensi/'+curUser.username);
+        if(myAbs){
+          DB.setLocal('absensi', {...(getAllAbsensi()), [curUser.username]: myAbs});
+        }
+        if(typeof updateAbsenModeUI==='function') updateAbsenModeUI();
+      } catch(e){ console.error(e); }
+    }, 100);
+    // GPS otomatis aktif — kamera baru nyala setelah user klik tombol Masuk/Keluar
     setTimeout(()=>{
-      try{ if(typeof updateAbsenModeUI==='function') updateAbsenModeUI(); }catch(e){console.error(e);}
       try{ if(!lokasiData) getLoc(); }catch(e){console.error(e);}
-      // Kamera otomatis aktif (tanpa user klik dulu)
-      try{ if(typeof startCam==='function') startCam(); }catch(e){console.error(e);}
     }, 400);
   }
   // Sembunyikan tab Karyawan, Laporan, Setting untuk karyawan
@@ -2386,18 +2758,17 @@ function gp(id,btn){
   try {
     if(id==='absen' && typeof updateAbsenModeUI==='function'){
       updateAbsenModeUI();
-      // Auto-deteksi GPS kalau belum ada
+      // Absensi untuk cek reminder — fetch on-demand kalau belum ada
+      ensureAbsensiLoaded().then(()=>{ try{ updateAbsenModeUI(); }catch(e){} });
+      // Auto-deteksi GPS kalau belum ada (kamera baru nyala setelah pilih tombol)
       if(!lokasiData){ setTimeout(()=>{ try{ getLoc(); }catch(e){console.error(e);} }, 200); }
-      // Auto-aktifkan kamera (tanpa user perlu klik dulu)
-      if(!camStream && !fotoData){
-        setTimeout(()=>{ try{ if(typeof startCam==='function') startCam(); }catch(e){console.error(e);} }, 300);
-      }
     }
-    if(id==='riwayat') renderRiwayat();
-    if(id==='gaji') calcGaji();
+    // Tab-tab yang butuh data absensi lengkap → fetch dulu on-demand
+    if(id==='riwayat')   ensureAbsensiLoaded().then(()=>renderRiwayat());
+    if(id==='gaji')      ensureAbsensiLoaded().then(()=>calcGaji());
     if(id==='notif'){renderNotif();document.getElementById('ndot').style.display='none';}
-    if(id==='admin'){renderAdminDash();renderEmpList();populateLapFilter();loadSetting();}
-    if(id==='dashboard') renderDashboardStat();
+    if(id==='admin')     ensureAbsensiLoaded().then(()=>{renderAdminDash();renderEmpList();populateLapFilter();loadSetting();});
+    if(id==='dashboard') ensureAbsensiLoaded().then(()=>renderDashboardStat());
     if(id==='rekapphl' && typeof initRekapPHL==='function') initRekapPHL();
   } catch(e){console.error('Render error:',e);}
 }
@@ -2538,21 +2909,19 @@ function snap(e){
   document.getElementById('btnRe').style.display='flex';
   stopCam(false);
 
-  // ── AUTO ABSEN: cek mode hari ini (masuk/keluar/selesai) ──
-  const mode = getAbsenMode();
-  if(mode === 'selesai'){
-    toast('✅ Anda sudah absen masuk & keluar hari ini','ok');
+  // ── ABSEN dengan MODE yang sudah dipilih user (dari tombol Masuk/Keluar) ──
+  if(!absenPending){
+    toast('❗ Pilih mode absen dulu (Masuk atau Keluar)','er');
     return;
   }
-  toast('📸 Foto berhasil! Memproses '+(mode==='masuk'?'absen masuk':'absen keluar')+'...','ok');
-  // Auto-detect & langsung jalankan doAbsen
+  toast('📸 Foto berhasil! Memproses absen '+absenPending+'...','ok');
+  // Langsung buka konfirmasi
   setTimeout(()=>{
-    // Pastikan lokasi sudah ada
     if(!lokasiData){
       toast('❗ Deteksi lokasi GPS dahulu, klik tombol "Deteksi"','er');
       return;
     }
-    doAbsen(mode);
+    doAbsen(absenPending);
   }, 400);
 }
 
@@ -2569,29 +2938,278 @@ function getAbsenMode(){
 
 // Update tampilan badge absen mode (panggil setiap kali balik ke tab absen)
 function updateAbsenModeUI(){
-  const el = document.getElementById('absenModeText');
-  const hint = document.getElementById('absenModeHint');
-  const box = document.getElementById('absenModeInfo');
-  if(!el || !box) return;
-  const mode = getAbsenMode();
-  if(mode === 'masuk'){
-    box.style.background = 'linear-gradient(135deg,#dcfce7,#bbf7d0)';
-    box.style.borderColor = '#15803d';
-    el.textContent = '📸 Foto = Absen Masuk';
-    el.style.color = '#166534';
-    if(hint) hint.textContent = 'Cukup foto saja — sistem otomatis catat absen masuk';
-  } else if(mode === 'keluar'){
-    box.style.background = 'linear-gradient(135deg,#fee2e2,#fecaca)';
-    box.style.borderColor = '#dc2626';
-    el.textContent = '📸 Foto = Absen Keluar';
-    el.style.color = '#7f1d1d';
-    if(hint) hint.textContent = 'Sudah absen masuk hari ini · foto sekarang = absen keluar';
+  const btnMasuk  = document.getElementById('btn-mode-masuk');
+  const btnKeluar = document.getElementById('btn-mode-keluar');
+  const stMasuk   = document.getElementById('status-masuk');
+  const stKeluar  = document.getElementById('status-keluar');
+  if(!btnMasuk || !btnKeluar) return;
+
+  // Cek status absen hari ini
+  const today = new Date().toLocaleDateString('id-ID');
+  const list  = (getAllAbsensi()[curUser.username] || []);
+  const sudahMasuk  = list.find(a => a.tipe==='masuk'  && a.tgl===today);
+  const sudahKeluar = list.find(a => a.tipe==='keluar' && a.tgl===today);
+
+  // ── Tombol MASUK ──
+  if(sudahMasuk){
+    // Sudah masuk → disabled + tampilkan jam
+    btnMasuk.style.opacity = '0.5';
+    btnMasuk.style.cursor = 'not-allowed';
+    btnMasuk.style.background = 'linear-gradient(135deg,#94a3b8,#64748b)';
+    btnMasuk.disabled = true;
+    if(stMasuk) stMasuk.textContent = '✅ Sudah masuk '+sudahMasuk.jam;
   } else {
-    box.style.background = 'linear-gradient(135deg,#fef3c7,#fde68a)';
-    box.style.borderColor = '#ca8a04';
-    el.textContent = '✅ Sudah Absen Hari Ini';
-    el.style.color = '#854d0e';
-    if(hint) hint.textContent = 'Anda sudah absen masuk & keluar hari ini · Sampai besok!';
+    // Belum masuk → aktif
+    btnMasuk.style.opacity = '1';
+    btnMasuk.style.cursor = 'pointer';
+    btnMasuk.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
+    btnMasuk.disabled = false;
+    if(stMasuk) stMasuk.textContent = 'Klik untuk mulai';
+  }
+
+  // ── Tombol KELUAR ──
+  if(sudahKeluar){
+    // Sudah keluar → disabled + tampilkan jam
+    btnKeluar.style.opacity = '0.5';
+    btnKeluar.style.cursor = 'not-allowed';
+    btnKeluar.style.background = 'linear-gradient(135deg,#94a3b8,#64748b)';
+    btnKeluar.disabled = true;
+    if(stKeluar) stKeluar.textContent = '✅ Sudah keluar '+sudahKeluar.jam;
+  } else if(!sudahMasuk){
+    // Belum masuk → tombol keluar warning (klik masih bisa, tapi kasih peringatan)
+    btnKeluar.style.opacity = '0.75';
+    btnKeluar.style.cursor = 'pointer';
+    btnKeluar.style.background = 'linear-gradient(135deg,#f97316,#ea580c)';
+    btnKeluar.disabled = false;
+    if(stKeluar) stKeluar.textContent = '⚠️ Belum masuk hari ini';
+  } else {
+    // Sudah masuk, belum keluar → aktif normal
+    btnKeluar.style.opacity = '1';
+    btnKeluar.style.cursor = 'pointer';
+    btnKeluar.style.background = 'linear-gradient(135deg,#ef4444,#dc2626)';
+    btnKeluar.disabled = false;
+    if(stKeluar) stKeluar.textContent = 'Klik untuk mulai';
+  }
+
+  // ── REMINDER PULANG & DETEKSI LUPA ABSEN KEMARIN ──
+  cekReminderAbsen();
+}
+
+// Pilih mode absen (masuk atau keluar) → tampilkan kamera & set state
+function pilihModeAbsen(tipe){
+  // Guard: kalau tombol disabled, tolak
+  const btn = document.getElementById('btn-mode-'+tipe);
+  if(btn && btn.disabled){
+    toast('Tombol ini tidak bisa diklik','warn');
+    return;
+  }
+
+  // Kalau pilih keluar tapi belum absen masuk → konfirmasi
+  if(tipe === 'keluar'){
+    const today = new Date().toLocaleDateString('id-ID');
+    const list = (getAllAbsensi()[curUser.username] || []);
+    const sudahMasuk = list.find(a => a.tipe==='masuk' && a.tgl===today);
+    if(!sudahMasuk){
+      if(!confirm('⚠️ Anda BELUM absen masuk hari ini.\n\nYakin mau langsung absen keluar?\nSistem akan mencatat kehadiran tanpa jam masuk.')) return;
+    }
+  }
+
+  // Set state pending
+  absenPending = tipe;
+
+  // Sembunyikan picker, tampilkan banner + kamera
+  const picker = document.getElementById('absen-mode-picker');
+  const info   = document.getElementById('absenModeInfo');
+  const camBox = document.getElementById('camBox');
+  const textEl = document.getElementById('absenModeText');
+  const hintEl = document.getElementById('absenModeHint');
+
+  if(picker) picker.style.display = 'none';
+  if(camBox) camBox.style.display = '';
+
+  if(tipe === 'masuk'){
+    if(info){
+      info.style.display = '';
+      info.style.background = 'linear-gradient(135deg,#dcfce7,#bbf7d0)';
+      info.style.borderColor = '#15803d';
+    }
+    if(textEl){ textEl.textContent = '⬆️ Absen MASUK — Silakan Foto'; textEl.style.color = '#166534'; }
+    if(hintEl) hintEl.textContent = 'Ambil foto → lokasi & waktu akan dicatat sebagai absen masuk';
+  } else {
+    if(info){
+      info.style.display = '';
+      info.style.background = 'linear-gradient(135deg,#fee2e2,#fecaca)';
+      info.style.borderColor = '#dc2626';
+    }
+    if(textEl){ textEl.textContent = '⬇️ Absen KELUAR — Silakan Foto'; textEl.style.color = '#7f1d1d'; }
+    if(hintEl) hintEl.textContent = 'Ambil foto → lokasi & waktu akan dicatat sebagai absen keluar';
+  }
+
+  // Reset foto & auto-nyalakan kamera
+  fotoData = null;
+  setTimeout(()=>{
+    try{ if(typeof startCam === 'function') startCam(); }catch(e){console.error(e);}
+    try{ if(!lokasiData) getLoc(); }catch(e){console.error(e);}
+  }, 100);
+
+  // Scroll ke kamera
+  setTimeout(()=>{
+    if(camBox) camBox.scrollIntoView({behavior:'smooth', block:'center'});
+  }, 300);
+}
+
+// Batal pilih mode → kembali ke picker
+function batalPilihMode(){
+  absenPending = null;
+  fotoData = null;
+  stopCam(true);
+  const picker = document.getElementById('absen-mode-picker');
+  const info   = document.getElementById('absenModeInfo');
+  const camBox = document.getElementById('camBox');
+  if(picker) picker.style.display = '';
+  if(info)   info.style.display = 'none';
+  if(camBox) camBox.style.display = 'none';
+  // Reset canvas & video
+  const c = document.getElementById('cvs');
+  const v = document.getElementById('vid');
+  if(c) c.style.display = 'none';
+  if(v) v.style.display = 'none';
+  document.getElementById('btnSh').style.display = '';
+  document.getElementById('btnRe').style.display = 'none';
+}
+
+// Cek 2 kondisi & tampilkan reminder:
+// 1. Karyawan sudah absen masuk hari ini + jam > 17:00 + belum absen keluar
+// 2. Karyawan kemarin absen masuk tapi tidak absen keluar (lupa)
+function cekReminderAbsen(){
+  if(!curUser || curUser.role === 'admin') return;
+  const list = getAllAbsensi()[curUser.username] || [];
+  if(list.length === 0) return;
+
+  const now = new Date();
+  const today = now.toLocaleDateString('id-ID');
+  const kemarinDt = new Date(now.getTime() - 86400000);
+  const kemarin = kemarinDt.toLocaleDateString('id-ID');
+
+  const masukToday = list.find(r => r.tipe==='masuk' && r.tgl===today);
+  const keluarToday = list.find(r => r.tipe==='keluar' && r.tgl===today);
+  const masukKemarin = list.find(r => r.tipe==='masuk' && r.tgl===kemarin);
+  const keluarKemarin = list.find(r => r.tipe==='keluar' && r.tgl===kemarin);
+
+  // Hapus banner lama kalau ada
+  let banner = document.getElementById('absen-reminder-banner');
+  if(banner) banner.remove();
+
+  // Kondisi 1: sudah masuk hari ini, belum keluar, sudah > 17:00
+  if(masukToday && !keluarToday && now.getHours() >= 17){
+    banner = document.createElement('div');
+    banner.id = 'absen-reminder-banner';
+    banner.style.cssText = 'background:linear-gradient(135deg,#fef2f2,#fecaca);border:2px solid #dc2626;border-radius:12px;padding:12px 14px;margin-bottom:12px;box-shadow:0 3px 10px rgba(220,38,38,.2);animation:pulse 2s ease-in-out infinite';
+    banner.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="font-size:28px">🚪</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:800;color:#7f1d1d">⏰ Jangan Lupa Absen Pulang!</div>
+          <div style="font-size:11px;color:#991b1b;margin-top:2px">Anda absen masuk pukul <b>${masukToday.jam}</b> · Sekarang sudah <b>${now.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})}</b><br>Segera foto untuk absen pulang.</div>
+        </div>
+      </div>`;
+    const pg = document.getElementById('pg-absen');
+    if(pg) pg.insertBefore(banner, pg.firstChild);
+    return;
+  }
+
+  // Kondisi 2: kemarin masuk tapi tidak keluar (lupa)
+  if(masukKemarin && !keluarKemarin){
+    banner = document.createElement('div');
+    banner.id = 'absen-reminder-banner';
+    banner.style.cssText = 'background:linear-gradient(135deg,#fef3c7,#fde68a);border:2px solid #d97706;border-radius:12px;padding:12px 14px;margin-bottom:12px;box-shadow:0 3px 10px rgba(217,119,6,.2)';
+    banner.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="font-size:28px">⚠️</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:800;color:#7c2d12">Lupa Absen Pulang Kemarin?</div>
+          <div style="font-size:11px;color:#92400e;margin-top:2px;line-height:1.5">
+            Anda absen masuk <b>${kemarin}</b> jam <b>${masukKemarin.jam}</b> tapi tidak absen pulang.<br>
+            Hubungi admin untuk isi jam pulang kemarin, atau isi sendiri di bawah.
+          </div>
+          <button onclick="lengkapiAbsenKemarin()" style="margin-top:8px;background:linear-gradient(90deg,#d97706,#f59e0b);color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:11px;font-weight:800;cursor:pointer">✏️ Isi Jam Pulang Kemarin</button>
+        </div>
+      </div>`;
+    const pg = document.getElementById('pg-absen');
+    if(pg) pg.insertBefore(banner, pg.firstChild);
+  }
+}
+
+// Karyawan lengkapi absen pulang kemarin (misal lupa absen)
+async function lengkapiAbsenKemarin(){
+  const jam = prompt('Isi jam pulang kemarin (format HH:MM, contoh 17:00):');
+  if(!jam) return;
+  if(!/^\d{1,2}[:.]\d{2}$/.test(jam)){
+    toast('❗ Format jam salah, contoh: 17:00','er');
+    return;
+  }
+  const [jj, mm] = jam.replace('.',':').split(':').map(Number);
+  if(jj > 23 || mm > 59){ toast('❗ Jam tidak valid','er'); return; }
+
+  const now = new Date();
+  const kemarinDt = new Date(now.getFullYear(), now.getMonth(), now.getDate()-1, jj, mm);
+  const kemarinStr = kemarinDt.toLocaleDateString('id-ID');
+  const jamFmt = String(jj).padStart(2,'0')+':'+String(mm).padStart(2,'0');
+
+  if(!confirm(`Isi jam pulang untuk tanggal ${kemarinStr}: ${jamFmt}?\nData akan dikirim ke admin untuk verifikasi.`)) return;
+
+  showLoader('Menyimpan','Mengambil data...');
+  try {
+    const safe = await FB.getSafe('absensi/'+curUser.username);
+    if(!safe.ok){ hideLoader(); toast('❌ Koneksi gagal — coba lagi','er'); return; }
+    let list = Array.isArray(safe.data) ? safe.data : [];
+
+    // Cek lagi jangan sampai duplikat
+    if(list.find(r => r.tipe==='keluar' && r.tgl===kemarinStr)){
+      hideLoader(); toast('❗ Sudah ada absen keluar kemarin','er'); return;
+    }
+    const masukRec = list.find(r => r.tipe==='masuk' && r.tgl===kemarinStr);
+    if(!masukRec){ hideLoader(); toast('❗ Tidak ada absen masuk kemarin','er'); return; }
+
+    const cfg = getCfg();
+    const km = kemarinDt.getTime();
+    const durEfektifMs = Math.max(0, hitungDurasiEfektif(masukRec.ms || km-8*3600000, km, cfg));
+    const jj2 = Math.floor(durEfektifMs/3600000);
+    const mn2 = Math.floor((durEfektifMs%3600000)/60000);
+    const dur = jj2+'j '+mn2+'m';
+
+    // Update record masuk
+    const midx = list.findIndex(r => r.tipe==='masuk' && r.tgl===kemarinStr);
+    if(midx >= 0){
+      list[midx].durasiMs = durEfektifMs;
+      list[midx].durasi = dur;
+    }
+    // Tambah record keluar
+    list.unshift({
+      tipe:'keluar', jam:jamFmt, tgl:kemarinStr,
+      lokasi:{lat:'0',lon:'0',kota:'Tidak Diketahui'}, foto:'',
+      ms:km, durasiMs:durEfektifMs, durasi:dur, manual:true, isiSendiri:true
+    });
+
+    const ok = await FB.set('absensi/'+curUser.username, list);
+    hideLoader();
+    if(!ok){
+      PendingQueue.add(curUser.username, 'keluar', list[0]);
+      toast('⏳ Tersimpan lokal — akan sync saat online','warn');
+    } else {
+      toast('✅ Absen pulang kemarin tercatat: '+dur,'ok');
+    }
+    DB.setLocal('absensi', {...getAllAbsensi(), [curUser.username]: list});
+    pushNotif('warn','Isi Absen Kemarin', curUser.nama+' isi manual absen pulang '+kemarinStr+' jam '+jamFmt);
+
+    // Refresh UI
+    const banner = document.getElementById('absen-reminder-banner');
+    if(banner) banner.remove();
+    if(typeof updateAbsenModeUI === 'function') updateAbsenModeUI();
+    if(typeof renderRiwayat === 'function') renderRiwayat();
+  } catch(err){
+    hideLoader();
+    toast('❌ Error: '+err.message,'er');
   }
 }
 
@@ -2909,10 +3527,24 @@ async function konfirmasi(){
       ms:n.getTime(), terlambat, durasiMs:0, durasi:''
     };
     list.unshift(rec);
+    // Auto-trim foto > 30 hari untuk kurangi ukuran data yang di-upload
+    const trimRes = trimOldPhotos(list, 30);
+    list = trimRes.list;
+    if(trimRes.trimmed > 0){
+      console.log(`🗜️  Trim ${trimRes.trimmed} foto lama, hemat ${(trimRes.savedBytes/1024/1024).toFixed(1)}MB`);
+      updateLoader('Menyimpan Absen', `Mengoptimasi ${trimRes.trimmed} foto lama untuk kecepatan...`);
+    }
     const ok = await FB.set('absensi/'+curUser.username, list);
     hideLoader();
     if(!ok){
-      toast('❌ Gagal upload — coba lagi','er');
+      // Upload gagal → simpan ke pending queue supaya tidak hilang
+      PendingQueue.add(curUser.username, 'masuk', rec);
+      DB.setLocal('absensi', {...getAllAbsensi(), [curUser.username]: list});
+      sessMasukMs=n.getTime();
+      document.getElementById('s-masuk').textContent=j+' ⏳';
+      toast('⏳ Absen tersimpan lokal — akan sync otomatis saat online','warn');
+      pushNotif('warn','Pending Sync',curUser.nama+' absen masuk '+j+' (menunggu sync ke server)');
+      stopCam(true);
       return;
     }
     DB.setLocal('absensi', {...getAllAbsensi(), [curUser.username]: list});
@@ -2958,10 +3590,25 @@ async function konfirmasi(){
       lokasi:{...lokasiData}, foto:fotoData||'',
       ms:km, durasiMs:durEfektifMs, durasi:dur, durasiTotal:durTotalMs
     });
+    // Auto-trim foto > 30 hari untuk kurangi ukuran data yang di-upload
+    const trimResK = trimOldPhotos(list, 30);
+    list = trimResK.list;
+    if(trimResK.trimmed > 0){
+      console.log(`🗜️  Trim ${trimResK.trimmed} foto lama, hemat ${(trimResK.savedBytes/1024/1024).toFixed(1)}MB`);
+      updateLoader('Menyimpan Absen', `Mengoptimasi ${trimResK.trimmed} foto lama untuk kecepatan...`);
+    }
     const ok = await FB.set('absensi/'+curUser.username, list);
     hideLoader();
     if(!ok){
-      toast('❌ Gagal upload — coba lagi','er');
+      // Upload gagal → simpan record KELUAR ke pending queue
+      const recKeluar = list[0]; // record baru saja di unshift
+      PendingQueue.add(curUser.username, 'keluar', recKeluar);
+      DB.setLocal('absensi', {...getAllAbsensi(), [curUser.username]: list});
+      document.getElementById('s-keluar').textContent=j+' ⏳';
+      document.getElementById('s-dur').textContent=dur;
+      toast('⏳ Absen pulang tersimpan lokal — sync otomatis saat online','warn');
+      pushNotif('warn','Pending Sync',curUser.nama+' absen keluar '+j+' (menunggu sync)');
+      stopCam(true);
       return;
     }
     DB.setLocal('absensi', {...getAllAbsensi(), [curUser.username]: list});
@@ -2986,6 +3633,11 @@ async function konfirmasi(){
     hideLoader();
     // Reset guard supaya user bisa coba lagi
     window._absenSubmitting = false;
+    // Kembali ke picker mode (2 tombol Masuk/Keluar)
+    setTimeout(()=>{
+      if(typeof batalPilihMode === 'function') batalPilihMode();
+      if(typeof updateAbsenModeUI === 'function') updateAbsenModeUI();
+    }, 800);
   }
 }
 
@@ -5787,24 +6439,59 @@ function initPWA(){
   window.addEventListener('appinstalled',()=>{document.getElementById('install-banner').style.display='none';toast('🎉 OWL berhasil diinstall!','ok');});
 }
 
-// ── SESSION PERSIST (tetap login setelah refresh) ────
-// Simpan session ke sessionStorage (hilang saat tab ditutup, tapi tetap saat refresh)
+// ── SESSION PERSIST (tetap login seperti aplikasi native) ────
+// Simpan ke localStorage supaya session TIDAK hilang saat aplikasi ditutup di HP
+// Session berlaku 30 hari — perilaku seperti WhatsApp/Instagram (tidak perlu login ulang tiap buka)
+// Refresh timestamp otomatis setiap akses supaya aktif = terus login
 function saveSession(user){
-  try{sessionStorage.setItem('owl_session',JSON.stringify({username:user.username,ts:Date.now()}));}catch(e){}
+  try{
+    localStorage.setItem('owl_session',JSON.stringify({
+      username: user.username,
+      ts: Date.now(),
+      lastActive: Date.now()
+    }));
+  }catch(e){ console.warn('Session save fail:', e.message); }
 }
 function loadSession(){
   try{
-    const s=JSON.parse(sessionStorage.getItem('owl_session'));
-    if(!s)return null;
-    // Session berlaku max 12 jam
-    if(Date.now()-s.ts > 12*3600*1000){sessionStorage.removeItem('owl_session');return null;}
-    const users=getUsers();
-    if(users[s.username]){return {...users[s.username],username:s.username};}
+    // Utamakan localStorage (persistent) — fallback sessionStorage (legacy)
+    let raw = localStorage.getItem('owl_session') || sessionStorage.getItem('owl_session');
+    if(!raw) return null;
+    const s = JSON.parse(raw);
+    if(!s || !s.username) return null;
+
+    // Migrasi dari sessionStorage lama ke localStorage baru
+    if(!localStorage.getItem('owl_session') && sessionStorage.getItem('owl_session')){
+      localStorage.setItem('owl_session', raw);
+    }
+
+    // Session berlaku 30 hari dari lastActive (refresh setiap kali dipakai)
+    const lastActive = s.lastActive || s.ts;
+    const MAX_INACTIVE_MS = 30 * 24 * 3600 * 1000; // 30 hari
+    if(Date.now() - lastActive > MAX_INACTIVE_MS){
+      console.log('Session expired: >30 hari tidak aktif');
+      localStorage.removeItem('owl_session');
+      sessionStorage.removeItem('owl_session');
+      return null;
+    }
+
+    // Refresh lastActive supaya session diperpanjang otomatis
+    s.lastActive = Date.now();
+    try{ localStorage.setItem('owl_session', JSON.stringify(s)); }catch(e){}
+
+    const users = getUsers();
+    if(users[s.username]){
+      return {...users[s.username], username: s.username};
+    }
     return null;
-  }catch(e){return null;}
+  }catch(e){
+    console.warn('Session load error:', e.message);
+    return null;
+  }
 }
 function clearSession(){
-  try{sessionStorage.removeItem('owl_session');}catch(e){}
+  try{ localStorage.removeItem('owl_session'); }catch(e){}
+  try{ sessionStorage.removeItem('owl_session'); }catch(e){}
 }
 
 // ── BACKUP OTOMATIS HARIAN ───────────────────────────
@@ -5854,15 +6541,20 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   // Init Firebase + load data
   await initData();
 
-  // Cek session aktif (tidak keluar saat refresh)
+  // Cek session aktif (tidak keluar saat aplikasi ditutup)
+  // Session tersimpan di localStorage — persist sampai 30 hari tidak aktif
   const sess = loadSession();
   if(sess){
     curUser = sess;
     document.getElementById('login-screen').style.display='none';
+    const regScr = document.getElementById('register-screen');
+    if(regScr) regScr.style.display='none';
     document.getElementById('app-screen').style.display='block';
-    document.getElementById('first-box').style.display='none';
+    const fb = document.getElementById('first-box');
+    if(fb) fb.style.display='none';
     initApp();
-    cekBackupHarian();
+    if(typeof cekBackupHarian === 'function') cekBackupHarian();
+    console.log('✅ Auto-login sebagai:', sess.username);
   } else {
     document.getElementById('uname').focus();
   }
