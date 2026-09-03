@@ -1,4 +1,4 @@
-const CACHE = 'owl-v10';
+const CACHE = 'owl-v11';
 // Path relatif (tanpa leading slash) agar bekerja di GitHub Pages subfolder
 const ASSETS = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 

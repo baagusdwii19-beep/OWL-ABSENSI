@@ -1385,7 +1385,19 @@ setInterval(() => {
       if(res.synced > 0) console.log(`Auto-sync: ${res.synced} berhasil`);
     });
   }
+  // Refresh data karyawan sendiri setiap 60 detik supaya sync dengan perubahan admin
+  if(curUser && curUser.role !== 'admin' && navigator.onLine){
+    refreshMyAbsensi();
+  }
 }, 60000);
+
+// Auto-refresh saat aplikasi kembali ke foreground (misal karyawan buka HP lagi)
+document.addEventListener('visibilitychange', ()=>{
+  if(!document.hidden && curUser && curUser.role !== 'admin' && navigator.onLine){
+    console.log('👀 App kembali visible → refresh absensi');
+    refreshMyAbsensi();
+  }
+});
 
 // Sync saat online kembali
 window.addEventListener('online', () => {
@@ -1730,6 +1742,55 @@ async function ensureAbsensiLoaded(force=false){
     return data;
   }
   return {};
+}
+
+// Force refresh HANYA data absensi karyawan yang sedang login
+// Dipanggil saat karyawan buka tab Absen — supaya kalau admin hapus/edit dari sisi admin,
+// karyawan langsung lihat data terbaru (bukan cache lama)
+async function refreshMyAbsensi(){
+  if(!curUser || !curUser.username) return;
+  try {
+    const myAbs = await FB.get('absensi/'+curUser.username);
+    // Update cache dengan data fresh dari Firebase (bahkan kalau null/empty — artinya semua dihapus)
+    const all = getAllAbsensi();
+    all[curUser.username] = Array.isArray(myAbs) ? myAbs : [];
+    DB.setLocal('absensi', all);
+    console.log('🔄 Refresh absensi:', curUser.username, '→', all[curUser.username].length, 'records');
+    // Update UI status Masuk/Keluar/Durasi hari ini
+    refreshHeaderAbsen();
+    // Update tombol pilihan Masuk/Keluar
+    if(typeof updateAbsenModeUI === 'function') updateAbsenModeUI();
+    return all[curUser.username];
+  } catch(e){
+    console.warn('refreshMyAbsensi error:', e.message);
+    return null;
+  }
+}
+
+// Refresh tampilan header status Masuk/Keluar/Durasi berdasarkan data hari ini
+function refreshHeaderAbsen(){
+  if(!curUser) return;
+  const today = new Date().toLocaleDateString('id-ID');
+  const list = getUserAbs(curUser.username);
+  const masuk  = list.find(a => a.tipe==='masuk'  && a.tgl===today);
+  const keluar = list.find(a => a.tipe==='keluar' && a.tgl===today);
+
+  const sMasuk  = document.getElementById('s-masuk');
+  const sKeluar = document.getElementById('s-keluar');
+  const sDur    = document.getElementById('s-dur');
+  if(sMasuk)  sMasuk.textContent  = masuk  ? masuk.jam  : '--:--';
+  if(sKeluar) sKeluar.textContent = keluar ? keluar.jam : '--:--';
+  if(sDur){
+    if(masuk && masuk.durasiMs){
+      const jj = Math.floor(masuk.durasiMs/3600000);
+      const mm = Math.floor((masuk.durasiMs%3600000)/60000);
+      sDur.textContent = jj+'j '+mm+'m';
+    } else {
+      sDur.textContent = '0j 0m';
+    }
+  }
+  // Update session state
+  if(masuk && !keluar) sessMasukMs = masuk.ms;
 }
 const getUserAbs  = uid => (getAllAbsensi()[uid]) || [];
 
@@ -2695,15 +2756,11 @@ function initApp(){
     if(nbAbsen) nbAbsen.classList.add('on');
     const pgAbsen = document.getElementById('pg-absen');
     if(pgAbsen) pgAbsen.classList.add('on');
-    // Karyawan cuma butuh /absensi/{username} — jauh lebih ringan dari fetch all
+    // Karyawan: refresh data absensi dari Firebase (bukan pakai cache)
+    // Ini bikin kalau admin hapus/edit dari sisi admin, karyawan langsung lihat data terbaru
     setTimeout(async () => {
       try {
-        // Fetch HANYA data absensi karyawan ini (bukan semua karyawan)
-        const myAbs = await FB.get('absensi/'+curUser.username);
-        if(myAbs){
-          DB.setLocal('absensi', {...(getAllAbsensi()), [curUser.username]: myAbs});
-        }
-        if(typeof updateAbsenModeUI==='function') updateAbsenModeUI();
+        await refreshMyAbsensi(); // fetch fresh dari FB & update header UI
       } catch(e){ console.error(e); }
     }, 100);
     // GPS otomatis aktif — kamera baru nyala setelah user klik tombol Masuk/Keluar
@@ -2758,8 +2815,13 @@ function gp(id,btn){
   try {
     if(id==='absen' && typeof updateAbsenModeUI==='function'){
       updateAbsenModeUI();
-      // Absensi untuk cek reminder — fetch on-demand kalau belum ada
-      ensureAbsensiLoaded().then(()=>{ try{ updateAbsenModeUI(); }catch(e){} });
+      // Untuk karyawan: SELALU refresh dari Firebase (biar kalau admin hapus/edit, langsung sync)
+      // Untuk admin: cukup pakai cache biar tidak lambat
+      if(curUser.role !== 'admin'){
+        refreshMyAbsensi(); // fresh dari FB → update header & tombol
+      } else {
+        ensureAbsensiLoaded().then(()=>{ try{ updateAbsenModeUI(); }catch(e){} });
+      }
       // Auto-deteksi GPS kalau belum ada (kamera baru nyala setelah pilih tombol)
       if(!lokasiData){ setTimeout(()=>{ try{ getLoc(); }catch(e){console.error(e);} }, 200); }
     }
