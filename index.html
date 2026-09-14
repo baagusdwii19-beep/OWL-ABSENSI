@@ -1040,9 +1040,9 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
         </div>
 
         <div style="background:#dcfce7;border:1px solid #86efac;border-radius:9px;padding:10px;font-size:11px;color:#166534;margin-bottom:12px;line-height:1.6">
-          <b>💡 Sistem Gaji Sederhana:</b><br>
-          Gaji = <b>Jam Kerja × Tarif Per Jam</b><br>
-          Pembulatan otomatis ke kelipatan setengah jam terdekat.<br>
+          <b>💡 Sistem Gaji Transparan:</b><br>
+          Gaji = <b>Jam Kerja × Tarif Per Jam</b> (perhitungan persis, tanpa pembulatan)<br>
+          Contoh: 8 jam 30 menit × Rp 12.500 = Rp 106.250<br>
           <i>Pakai <b>Aturan Gaji Custom</b> di bawah kalau ingin mapping jam→gaji tertentu.</i>
         </div>
 
@@ -3162,8 +3162,15 @@ function cekReminderAbsen(){
   let banner = document.getElementById('absen-reminder-banner');
   if(banner) banner.remove();
 
-  // Kondisi 1: sudah masuk hari ini, belum keluar, sudah > 17:00
-  if(masukToday && !keluarToday && now.getHours() >= 17){
+  // Reminder pulang: cek berdasarkan jam kerja dari config (bukan hardcoded 17:00)
+  // Trigger banner kalau sudah lewat jamKeluar dan belum absen keluar
+  const cfg = getCfg();
+  const [jkH, jkM] = (cfg.jamKeluar || '17:00').split(':').map(Number);
+  const jamKeluarStandar = new Date(now.getFullYear(), now.getMonth(), now.getDate(), jkH, jkM);
+  const sudahLewatJamKeluar = now.getTime() >= jamKeluarStandar.getTime();
+
+  // Kondisi 1: sudah masuk hari ini, belum keluar, sudah lewat jam keluar standar
+  if(masukToday && !keluarToday && sudahLewatJamKeluar){
     banner = document.createElement('div');
     banner.id = 'absen-reminder-banner';
     banner.style.cssText = 'background:linear-gradient(135deg,#fef2f2,#fecaca);border:2px solid #dc2626;border-radius:12px;padding:12px 14px;margin-bottom:12px;box-shadow:0 3px 10px rgba(220,38,38,.2);animation:pulse 2s ease-in-out infinite';
@@ -4003,17 +4010,14 @@ async function calcGaji(){
     bList = bList.filter(r => r.ms > lastResetMs);
   }
 
-  // Hitung total — jam dibayar (bulatan) untuk gaji, jam asli untuk tampilan
+  // Hitung total — jam ASLI dipakai untuk gaji (bukan pembulatan per hari)
+  // Ini biar gaji sesuai dengan jam yang ditampilkan (tidak ada selisih membingungkan)
   const totMs       = bList.reduce((s,r)=>s+(r.durasiMs||0),0);
   const totJamAsli  = totMs/3600000;
-  // Total gaji = sum gaji harian (per hari dibulatkan ke setengah jam)
-  let totJamBayar = 0, total = 0;
-  bList.forEach(r=>{
-    const jB = bulatkanJam((r.durasiMs||0)/3600000);
-    totJamBayar += jB;
-    total += hitungGaji(jB, cfg);
-  });
-  const totJam   = totJamBayar; // backward compat — yang dipakai untuk gaji
+  // Gaji dihitung dari total jam ASLI × tarif per jam (transparan)
+  const total = hitungGaji(totJamAsli, cfg);
+  const totJamBayar = totJamAsli; // sama dengan jam asli (tidak dibulatkan)
+  const totJam   = totJamBayar; // backward compat
   const totHari  = bList.length;
   const totPotong= bList.reduce((s,r)=>s+((r.durasiTotal||0)-(r.durasiMs||0)),0);
   const potongMnt= Math.round(totPotong/60000);
@@ -4074,7 +4078,7 @@ async function calcGaji(){
   const iInfo=cfg.istirahatMulai?`<div class="gr-row" style="border-top:1px dashed var(--br)"><span class="grl">⏸ Potongan istirahat</span><span class="grv" style="color:var(--am)">${potongMnt} menit terpotong</span></div>`:'';
   document.getElementById('g-minggu').innerHTML=wk.map((w,i)=>{
     const jamAsli=wMs[i]/3600000;
-    const jamB=bulatkanJam(jamAsli);
+    const jamB=jamAsli; // pakai jam asli (transparan)
     const gj=hitungGaji(jamB, cfg);
     return `<div class="gr-row"><span class="grl">${w}</span><span class="grv">${fmtJam(jamAsli)} jam · ${fmt(gj)}</span></div>`;
   }).join('')+iInfo;
@@ -4095,7 +4099,7 @@ async function calcGaji(){
         const blnNm    = BL[d.getMonth()].slice(0,3);
         const jamMs    = r.durasiMs||0;
         const jamAsli  = jamMs/3600000;
-        const jamKerja = bulatkanJam(jamAsli);
+        const jamKerja = jamAsli; // pakai jam asli (transparan)
         const gajiHari = hitungGaji(jamKerja, cfg);
         const keluar   = list.find(x=>x.tgl===r.tgl && x.tipe==='keluar');
         const jamMasukStr  = r.jam || '--:--';
@@ -4416,12 +4420,10 @@ async function renderDashboardStat(){
       const list = (absensi[uid]||[]).filter(r=>r.tipe==='masuk' && r.ms>=tglMulai && r.ms<=tglAkhir);
       const hari = list.length;
       const jamAsli = list.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000;
-      let jamBayar=0, gaji=0;
-      list.forEach(r=>{
-        const jB = bulatkanJam((r.durasiMs||0)/3600000);
-        jamBayar += jB;
-        gaji += hitungGaji(jB, cfg);
-      });
+      // Gaji dihitung dari TOTAL jam asli × tarif (bukan per hari dibulatkan)
+      // Ini biar transparan: jam yang tampil = jam yang dibayar
+      const jamBayar = jamAsli;
+      const gaji = hitungGaji(jamAsli, cfg);
       const terlambat = list.filter(r=>r.terlambat).length;
       return {uid, nama:u.nama, jab:u.jab||'-', warna:u.warna||'#0ea5e9', foto:u.foto,
               hari, jamAsli, jamBayar, gaji, terlambat};
@@ -5412,14 +5414,10 @@ async function renderLap(){
   let gtotal=0,gjam=0;
   document.getElementById('lap-body').innerHTML=rows.map(([uid,u])=>{
     const list=(absensi[uid]||[]).filter(r=>r.tipe==='masuk' && r.ms>=tglMulai && r.ms<=tglAkhir);
-    // Total gaji: sum per-hari (dibulatkan setengah jam masing-masing)
+    // Total gaji: dari total jam asli × tarif (transparan, tanpa pembulatan per hari)
     const jamAsli = list.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000;
-    let jam = 0, gaji = 0;
-    list.forEach(r=>{
-      const jB = bulatkanJam((r.durasiMs||0)/3600000);
-      jam += jB;
-      gaji += hitungGaji(jB, cfg);
-    });
+    const jam = jamAsli;
+    const gaji = hitungGaji(jamAsli, cfg);
     const hari = list.length;
     gtotal+=gaji;gjam+=jamAsli;
     return `<tr>
@@ -5460,17 +5458,14 @@ async function exportCSV(){
     if(empF!=='all')rows=rows.filter(([uid])=>uid===empF);
     const fmt = v=>v.toLocaleString('id-ID');
 
-    // Hitung total — jam asli untuk tampilan, gaji dari sum per-hari (bulatan ke 30 menit)
+    // Hitung total — gaji dihitung dari total jam asli × tarif (transparan)
     let totHari=0, totJamAsli=0, totJamBayar=0, totGaji=0;
     const dataRows = rows.map(([uid,u])=>{
       const list=(absensi[uid]||[]).filter(r=>r.tipe==='masuk' && r.ms>=tglMulai && r.ms<=tglAkhir);
       const jamAsli = list.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000;
-      let jamBayar=0, gaji=0;
-      list.forEach(r=>{
-        const jB = bulatkanJam((r.durasiMs||0)/3600000);
-        jamBayar += jB;
-        gaji += hitungGaji(jB, cfg);
-      });
+      // Gaji dihitung dari TOTAL jam asli (bukan per hari dibulatkan)
+      const jamBayar = jamAsli;
+      const gaji = hitungGaji(jamAsli, cfg);
       totHari += list.length; totJamAsli += jamAsli; totJamBayar += jamBayar; totGaji += gaji;
       return {nama:u.nama, jab:u.jab||'-', div:u.div||'-', id:u.id||'-', hari:list.length, jamAsli, jamBayar, gaji};
     });
@@ -5588,11 +5583,9 @@ async function resetGaji(){
       karyawan.forEach(([uid,u])=>{
         const lastR = u.lastResetMs || 0;
         const list = (absensi[uid]||[]).filter(r=>r.tipe==='masuk' && r.ms > lastR);
-        let totGaji=0, totHari=list.length;
-        list.forEach(r=>{
-          const jB = bulatkanJam((r.durasiMs||0)/3600000);
-          totGaji += hitungGaji(jB, cfg);
-        });
+        const totHari = list.length;
+        const totJamAsli = list.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000;
+        const totGaji = hitungGaji(totJamAsli, cfg);
         ringkasan.push({nama:u.nama, hari:totHari, gaji:totGaji});
       });
       const totSemua = ringkasan.reduce((s,r)=>s+r.gaji,0);
@@ -5627,11 +5620,8 @@ async function resetGaji(){
       if(!u){toast('❗ Karyawan tidak ditemukan','er');return;}
       const lastR = u.lastResetMs || 0;
       const list = (absensi[targetUid]||[]).filter(r=>r.tipe==='masuk' && r.ms > lastR);
-      let totGaji=0;
-      list.forEach(r=>{
-        const jB = bulatkanJam((r.durasiMs||0)/3600000);
-        totGaji += hitungGaji(jB, cfg);
-      });
+      const totJamAsli = list.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000;
+      const totGaji = hitungGaji(totJamAsli, cfg);
       const periodeStr = lastR>0 
         ? 'sejak '+new Date(lastR).toLocaleDateString('id-ID')
         : 'seluruh periode';
@@ -5748,7 +5738,7 @@ async function exportRincianExcel(){
     const hariNm = HARI[d.getDay()];
     const jamMs = r.durasiMs||0;
     const jamAsli  = jamMs/3600000;
-    const jamKerja = bulatkanJam(jamAsli);
+    const jamKerja = jamAsli; // pakai jam asli (transparan)
     const gajiHari = hitungGaji(jamKerja, cfg);
     const keluar = list.find(x=>x.tgl===r.tgl && x.tipe==='keluar');
     const jamMasukStr = r.jam || '--:--';
@@ -5901,8 +5891,8 @@ async function exportRincianExcelSemua(users, absensi, cfg, tglMulai, tglAkhir, 
 
       const jamMs = r.durasiMs || 0;
       const jamAsli = jamMs/3600000;
-      const jamBulat = bulatkanJam(jamAsli);
-      const gaji = hitungGaji(jamBulat, cfg);
+      const jamBulat = jamAsli; // pakai jam asli (transparan, tidak dibulatkan)
+      const gaji = hitungGaji(jamAsli, cfg);
       const telat = r.terlambat ? 1 : 0;
       // Cek apakah absen lebih awal dari jam standar (akan ditampilkan dengan tanda)
       const lebihAwal = (r.jam && r.jam < jamMasukStd);
