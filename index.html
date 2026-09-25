@@ -1067,8 +1067,21 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
 
           <div id="cfg-gaji-rules-list" style="margin-bottom:10px"></div>
 
+          <!-- PRESET CEPAT -->
+          <div style="background:rgba(255,255,255,0.7);border:1px dashed #d97706;border-radius:9px;padding:9px;margin-bottom:8px">
+            <div style="font-size:10px;font-weight:800;color:#7c2d12;margin-bottom:6px">⚡ Preset Cepat (Klik untuk isi otomatis)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <button type="button" onclick="applyPresetGaji('giibox-standar')" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none;border-radius:7px;padding:7px 8px;font-size:10px;font-weight:800;cursor:pointer;line-height:1.3">
+                🏭 Standar GII-BOX<br><span style="font-size:9px;opacity:.9;font-weight:600">17:00=90rb · 18:00=100rb · +12.5rb/j</span>
+              </button>
+              <button type="button" onclick="applyPresetGaji('giibox-lembur')" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;border-radius:7px;padding:7px 8px;font-size:10px;font-weight:800;cursor:pointer;line-height:1.3">
+                💼 Standar + Lembur<br><span style="font-size:9px;opacity:.9;font-weight:600">17=90rb · 18=100rb · +15rb/j</span>
+              </button>
+            </div>
+          </div>
+
           <button type="button" onclick="addGajiRule()" style="width:100%;background:#fff;color:#7c2d12;border:1.5px dashed #d97706;border-radius:9px;padding:8px;font-size:11px;font-weight:700;cursor:pointer">
-            <i class="ti ti-plus"></i> Tambah Aturan Gaji
+            <i class="ti ti-plus"></i> Tambah Aturan Gaji Manual
           </button>
         </div>
 
@@ -1809,15 +1822,23 @@ const fmtJam = jamDecimal => {
 };
 
 // ── HELPER: Hitung gaji harian ──────────────────────────
-// Default: simple formula gaji = jamBulat × tarifJam
+// Default: simple formula gaji = jam × tarifJam (persis, tanpa pembulatan)
 // Optional: kalau cfg.gajiRulesOn true & ada cfg.gajiRules,
-//          pakai bracket: cari rule terdekat (jam <= jamKerja),
-//          lalu add overtime untuk jam excess.
-function hitungGaji(jamBulat, cfg){
+//          - Jam kerja di-FLOOR ke kelipatan 30 menit (17:29 → 17:00, 17:30 → 17:30)
+//          - Pakai bracket: cari rule terdekat (jam <= jamKerja)
+//          - Excess di atas rule tertinggi = + tarifJam per jam
+function hitungGaji(jamKerja, cfg){
   const tarifJam = cfg.tarifJam || 12500;
 
   // Mode aturan custom aktif?
   if(cfg.gajiRulesOn && Array.isArray(cfg.gajiRules) && cfg.gajiRules.length > 0){
+    // FLOOR jam efektif ke kelipatan 30 menit (0.5 jam)
+    // Contoh: 7j 29m = 7.483 → floor → 7.0 jam (dibulatkan turun ke 17:00)
+    //         7j 30m = 7.5   → tetap 7.5 jam (dihitung 17:30)
+    //         7j 45m = 7.75  → floor → 7.5 jam (masih 17:30)
+    //         8j 00m = 8.0   → tetap 8.0 jam (lompat ke bracket 8)
+    const jamBulat = Math.floor(jamKerja * 2) / 2;
+
     // Sort ascending by jam
     const sorted = [...cfg.gajiRules].sort((a,b)=>(a.jam||0)-(b.jam||0));
     // Cari rule terakhir yang jam-nya <= jamBulat
@@ -1827,20 +1848,17 @@ function hitungGaji(jamBulat, cfg){
       else break;
     }
     if(lastRule){
-      // Excess = jam di atas rule tertinggi yang match
+      // Excess = jam di atas rule tertinggi yang match, pakai tarifJam normal
       const excess = jamBulat - lastRule.jam;
       const excessGaji = excess > 0 ? excess * tarifJam : 0;
       return Math.max(0, Math.round((lastRule.gaji||0) + excessGaji));
     }
-    // Di bawah aturan terendah → pakai proporsional dari aturan terendah
-    const first = sorted[0];
-    if(first && first.jam > 0){
-      return Math.max(0, Math.round(jamBulat / first.jam * (first.gaji||0)));
-    }
+    // Di bawah aturan terendah → pakai rate normal jam × tarif
+    return Math.max(0, Math.round(jamBulat * tarifJam));
   }
 
-  // Default: formula simple
-  return Math.max(0, Math.round(jamBulat * tarifJam));
+  // Default: formula simple (tanpa pembulatan)
+  return Math.max(0, Math.round(jamKerja * tarifJam));
 }
 
 async function saveUserAbs(uid, list){
@@ -4010,13 +4028,16 @@ async function calcGaji(){
     bList = bList.filter(r => r.ms > lastResetMs);
   }
 
-  // Hitung total — jam ASLI dipakai untuk gaji (bukan pembulatan per hari)
-  // Ini biar gaji sesuai dengan jam yang ditampilkan (tidak ada selisih membingungkan)
+  // Hitung total — jam ASLI untuk display, gaji dihitung PER HARI lalu di-sum
+  // (biar aturan gaji bracket berjalan per hari, bukan total bulan)
   const totMs       = bList.reduce((s,r)=>s+(r.durasiMs||0),0);
   const totJamAsli  = totMs/3600000;
-  // Gaji dihitung dari total jam ASLI × tarif per jam (transparan)
-  const total = hitungGaji(totJamAsli, cfg);
-  const totJamBayar = totJamAsli; // sama dengan jam asli (tidak dibulatkan)
+  // Loop per record, hitung gaji per hari, sum total
+  const total = bList.reduce((s,r)=>{
+    const jamHari = (r.durasiMs||0)/3600000;
+    return s + hitungGaji(jamHari, cfg);
+  }, 0);
+  const totJamBayar = totJamAsli;
   const totJam   = totJamBayar; // backward compat
   const totHari  = bList.length;
   const totPotong= bList.reduce((s,r)=>s+((r.durasiTotal||0)-(r.durasiMs||0)),0);
@@ -4420,10 +4441,12 @@ async function renderDashboardStat(){
       const list = (absensi[uid]||[]).filter(r=>r.tipe==='masuk' && r.ms>=tglMulai && r.ms<=tglAkhir);
       const hari = list.length;
       const jamAsli = list.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000;
-      // Gaji dihitung dari TOTAL jam asli × tarif (bukan per hari dibulatkan)
-      // Ini biar transparan: jam yang tampil = jam yang dibayar
+      // Gaji dihitung PER HARI lalu di-sum (biar bracket aturan berjalan per hari)
+      const gaji = list.reduce((s,r)=>{
+        const jamHari = (r.durasiMs||0)/3600000;
+        return s + hitungGaji(jamHari, cfg);
+      }, 0);
       const jamBayar = jamAsli;
-      const gaji = hitungGaji(jamAsli, cfg);
       const terlambat = list.filter(r=>r.terlambat).length;
       return {uid, nama:u.nama, jab:u.jab||'-', warna:u.warna||'#0ea5e9', foto:u.foto,
               hari, jamAsli, jamBayar, gaji, terlambat};
@@ -5414,10 +5437,13 @@ async function renderLap(){
   let gtotal=0,gjam=0;
   document.getElementById('lap-body').innerHTML=rows.map(([uid,u])=>{
     const list=(absensi[uid]||[]).filter(r=>r.tipe==='masuk' && r.ms>=tglMulai && r.ms<=tglAkhir);
-    // Total gaji: dari total jam asli × tarif (transparan, tanpa pembulatan per hari)
+    // Total gaji: dihitung PER HARI lalu di-sum (biar bracket aturan berjalan per hari)
     const jamAsli = list.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000;
     const jam = jamAsli;
-    const gaji = hitungGaji(jamAsli, cfg);
+    const gaji = list.reduce((s,r)=>{
+      const jamHari = (r.durasiMs||0)/3600000;
+      return s + hitungGaji(jamHari, cfg);
+    }, 0);
     const hari = list.length;
     gtotal+=gaji;gjam+=jamAsli;
     return `<tr>
@@ -5458,14 +5484,16 @@ async function exportCSV(){
     if(empF!=='all')rows=rows.filter(([uid])=>uid===empF);
     const fmt = v=>v.toLocaleString('id-ID');
 
-    // Hitung total — gaji dihitung dari total jam asli × tarif (transparan)
+    // Hitung total — gaji dihitung PER HARI lalu di-sum (biar bracket aturan berjalan per hari)
     let totHari=0, totJamAsli=0, totJamBayar=0, totGaji=0;
     const dataRows = rows.map(([uid,u])=>{
       const list=(absensi[uid]||[]).filter(r=>r.tipe==='masuk' && r.ms>=tglMulai && r.ms<=tglAkhir);
       const jamAsli = list.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000;
-      // Gaji dihitung dari TOTAL jam asli (bukan per hari dibulatkan)
+      const gaji = list.reduce((s,r)=>{
+        const jamHari = (r.durasiMs||0)/3600000;
+        return s + hitungGaji(jamHari, cfg);
+      }, 0);
       const jamBayar = jamAsli;
-      const gaji = hitungGaji(jamAsli, cfg);
       totHari += list.length; totJamAsli += jamAsli; totJamBayar += jamBayar; totGaji += gaji;
       return {nama:u.nama, jab:u.jab||'-', div:u.div||'-', id:u.id||'-', hari:list.length, jamAsli, jamBayar, gaji};
     });
@@ -5584,8 +5612,10 @@ async function resetGaji(){
         const lastR = u.lastResetMs || 0;
         const list = (absensi[uid]||[]).filter(r=>r.tipe==='masuk' && r.ms > lastR);
         const totHari = list.length;
-        const totJamAsli = list.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000;
-        const totGaji = hitungGaji(totJamAsli, cfg);
+        const totGaji = list.reduce((s,r)=>{
+          const jamHari = (r.durasiMs||0)/3600000;
+          return s + hitungGaji(jamHari, cfg);
+        }, 0);
         ringkasan.push({nama:u.nama, hari:totHari, gaji:totGaji});
       });
       const totSemua = ringkasan.reduce((s,r)=>s+r.gaji,0);
@@ -5621,7 +5651,10 @@ async function resetGaji(){
       const lastR = u.lastResetMs || 0;
       const list = (absensi[targetUid]||[]).filter(r=>r.tipe==='masuk' && r.ms > lastR);
       const totJamAsli = list.reduce((s,r)=>s+(r.durasiMs||0),0)/3600000;
-      const totGaji = hitungGaji(totJamAsli, cfg);
+      const totGaji = list.reduce((s,r)=>{
+        const jamHari = (r.durasiMs||0)/3600000;
+        return s + hitungGaji(jamHari, cfg);
+      }, 0);
       const periodeStr = lastR>0 
         ? 'sejak '+new Date(lastR).toLocaleDateString('id-ID')
         : 'seluruh periode';
@@ -6267,6 +6300,51 @@ function addGajiRule(){
   if(onChk) onChk.checked = true;
   toggleGajiRulesUI();
   updatePreviewGaji();
+}
+
+// Preset cepat: auto-isi Aturan Gaji Custom sesuai template
+function applyPresetGaji(preset){
+  const presets = {
+    'giibox-standar': {
+      rules: [
+        {jam: 7, gaji: 90000},
+        {jam: 8, gaji: 100000}
+      ],
+      tarifExtra: 12500,
+      label: '🏭 Standar GII-BOX',
+      desc: '• Pulang 17:00-17:29 → Rp 90.000\n• Pulang 17:30-17:59 → Rp 96.250\n• Pulang 18:00 (8 jam) → Rp 100.000\n• Lebih dari 18:00 → +Rp 12.500/jam\n\nJam kerja dibulatkan turun ke 30 menit terdekat.'
+    },
+    'giibox-lembur': {
+      rules: [
+        {jam: 7, gaji: 90000},
+        {jam: 8, gaji: 100000}
+      ],
+      tarifExtra: 15000,
+      label: '💼 Standar + Lembur',
+      desc: '• Pulang 17:00-17:29 → Rp 90.000\n• Pulang 17:30-17:59 → Rp 97.500\n• Pulang 18:00 (8 jam) → Rp 100.000\n• Lebih dari 18:00 (lembur) → +Rp 15.000/jam'
+    }
+  };
+  const p = presets[preset];
+  if(!p) return;
+
+  if(!confirm(`Terapkan Preset "${p.label}"?\n\n${p.desc}\n\nAturan gaji custom akan ter-overwrite. Jangan lupa klik "Simpan Semua Pengaturan" setelahnya.`)){
+    return;
+  }
+
+  // Set tarif per jam (untuk excess jam di atas aturan terbesar)
+  const tarifEl = document.getElementById('cfg-tarif');
+  if(tarifEl) tarifEl.value = p.tarifExtra;
+
+  // Isi rules
+  renderGajiRules(p.rules);
+
+  // Aktifkan checkbox aturan custom
+  const onChk = document.getElementById('cfg-gaji-rules-on');
+  if(onChk) onChk.checked = true;
+  toggleGajiRulesUI();
+  updatePreviewGaji();
+
+  toast(`✅ Preset "${p.label}" diterapkan — klik Simpan!`,'ok');
 }
 
 function hapusGajiRule(idx){
