@@ -897,6 +897,7 @@ html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:#bae6f
           <button onclick="setLapPeriode('week')" style="background:#fff;color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:5px 10px;font-size:10px;font-weight:600;cursor:pointer">7 Hari</button>
           <button onclick="setLapPeriode('30days')" style="background:#fff;color:var(--bd);border:1px solid var(--br);border-radius:7px;padding:5px 10px;font-size:10px;font-weight:600;cursor:pointer">30 Hari</button>
         </div>
+        <select id="sel-div" style="width:100%;padding:8px 10px;border:1px solid var(--br);border-radius:8px;font-size:11px;color:var(--tx);background:#fff;outline:none;margin-bottom:6px" onchange="renderLap()"><option value="all">🏢 Semua Divisi</option></select>
         <select id="sel-emp" style="width:100%;padding:8px 10px;border:1px solid var(--br);border-radius:8px;font-size:11px;color:var(--tx);background:#fff;outline:none" onchange="renderLap()"><option value="all">👤 Semua Karyawan</option></select>
       </div>
       <!-- Hidden untuk kompatibilitas -->
@@ -5397,11 +5398,27 @@ async function populateLapFilter(){
   const fbUsers=await FB.get('users');
   const users=fbUsers||getUsers();
   if(fbUsers) DB.setLocal('users',fbUsers);
+  const karyawan = Object.entries(users).filter(([,u])=>u.role!=='admin');
+
+  // Isi dropdown Divisi (unique, sorted)
+  const selD=document.getElementById('sel-div');
+  if(selD){
+    const divisiSet = new Set();
+    karyawan.forEach(([,u])=>{ if(u.div && u.div.trim()) divisiSet.add(u.div.trim()); });
+    const divisiArr = Array.from(divisiSet).sort();
+    const prevDiv = selD.value || 'all';
+    selD.innerHTML='<option value="all">🏢 Semua Divisi</option>'
+      + divisiArr.map(d=>`<option value="${d}">${d}</option>`).join('');
+    // Pertahankan pilihan sebelumnya jika masih ada
+    if(divisiArr.includes(prevDiv) || prevDiv==='all') selD.value = prevDiv;
+  }
+
+  // Isi dropdown Karyawan (filter sesuai divisi yang dipilih)
   const selE=document.getElementById('sel-emp');if(!selE)return;
-  selE.innerHTML='<option value="all">👤 Semua Karyawan</option>';
-  Object.entries(users).filter(([,u])=>u.role!=='admin').forEach(([uid,u])=>{
-    selE.innerHTML+=`<option value="${uid}">${u.nama}</option>`;
-  });
+  const divSel = (selD && selD.value) || 'all';
+  const filtered = divSel==='all' ? karyawan : karyawan.filter(([,u])=>(u.div||'').trim()===divSel);
+  selE.innerHTML='<option value="all">👤 Semua Karyawan</option>'
+    + filtered.map(([uid,u])=>`<option value="${uid}">${u.nama}${u.div?' · '+u.div:''}</option>`).join('');
   renderLap();
 }
 
@@ -5420,6 +5437,7 @@ async function renderLap(){
 
   const tglMulai = new Date(inMulai.value+'T00:00:00').getTime();
   const tglAkhir = new Date(inAkhir.value+'T23:59:59').getTime();
+  const divF=(document.getElementById('sel-div')||{value:'all'}).value;
   const empF=(document.getElementById('sel-emp')||{value:'all'}).value;
 
   // Ambil data terbaru dari Firebase
@@ -5431,9 +5449,36 @@ async function renderLap(){
   if(fbAbsensi) DB.setLocal('absensi', fbAbsensi);
   if(fbCfg)     DB.setLocal('config',  fbCfg);
 
+  // Re-sync dropdown karyawan dengan divisi terpilih
+  const selE2 = document.getElementById('sel-emp');
+  if(selE2){
+    const karyawanAll = Object.entries(users).filter(([,u])=>u.role!=='admin');
+    const filtered = divF==='all' ? karyawanAll : karyawanAll.filter(([,u])=>(u.div||'').trim()===divF);
+    const curVal = selE2.value;
+    const expected = '<option value="all">👤 Semua Karyawan</option>'
+      + filtered.map(([uid,u])=>`<option value="${uid}">${u.nama}${u.div?' · '+u.div:''}</option>`).join('');
+    if(selE2.innerHTML !== expected){
+      selE2.innerHTML = expected;
+      // Reset ke "all" kalau karyawan terpilih sebelumnya tidak masuk divisi
+      if(curVal!=='all' && !filtered.some(([uid])=>uid===curVal)) selE2.value = 'all';
+      else selE2.value = curVal;
+    }
+  }
+  const empFinal=(document.getElementById('sel-emp')||{value:'all'}).value;
+
   let rows=Object.entries(users).filter(([,u])=>u.role!=='admin');
-  if(empF!=='all')rows=rows.filter(([uid])=>uid===empF);
+  if(divF!=='all') rows=rows.filter(([,u])=>(u.div||'').trim()===divF);
+  if(empFinal!=='all')rows=rows.filter(([uid])=>uid===empFinal);
   const fmt=v=>'Rp '+v.toLocaleString('id-ID');
+  // Empty state: divisi/karyawan filter tidak match
+  if(rows.length===0){
+    const msg = divF!=='all' ? `Tidak ada karyawan di divisi "${divF}"` : 'Tidak ada data karyawan';
+    document.getElementById('lap-body').innerHTML = `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--mt);font-size:11px"><i class="ti ti-mood-empty" style="font-size:28px;color:var(--br);display:block;margin-bottom:6px"></i>${msg}</td></tr>`;
+    document.getElementById('lap-total-n').textContent='Rp 0';
+    const periodStr = new Date(inMulai.value).toLocaleDateString('id-ID')+' s/d '+new Date(inAkhir.value).toLocaleDateString('id-ID');
+    document.getElementById('lap-total-d').textContent='📆 '+periodStr+(divF!=='all'?' · 🏢 '+divF:'')+' · 0 karyawan';
+    return;
+  }
   let gtotal=0,gjam=0;
   document.getElementById('lap-body').innerHTML=rows.map(([uid,u])=>{
     const list=(absensi[uid]||[]).filter(r=>r.tipe==='masuk' && r.ms>=tglMulai && r.ms<=tglAkhir);
@@ -5457,7 +5502,8 @@ async function renderLap(){
   document.getElementById('lap-total-n').textContent=fmt(gtotal);
   const iLabel=cfg.istirahatMulai?' (dipotong istirahat '+cfg.istirahatMulai+'–'+cfg.istirahatSelesai+')':'';
   const periodStr = new Date(inMulai.value).toLocaleDateString('id-ID')+' s/d '+new Date(inAkhir.value).toLocaleDateString('id-ID');
-  document.getElementById('lap-total-d').textContent='📆 '+periodStr+' · '+rows.length+' karyawan · '+fmtJam(gjam)+' jam'+iLabel;
+  const divLabel = (divF && divF!=='all') ? ' · 🏢 '+divF : '';
+  document.getElementById('lap-total-d').textContent='📆 '+periodStr+divLabel+' · '+rows.length+' karyawan · '+fmtJam(gjam)+' jam'+iLabel;
 }
 
 async function exportCSV(){
@@ -5698,6 +5744,8 @@ async function exportRincianExcel(){
   const lapMulai = document.getElementById('lap-tgl-mulai');
   const lapAkhir = document.getElementById('lap-tgl-akhir');
   const lapEmp   = document.getElementById('sel-emp');
+  const lapDiv   = document.getElementById('sel-div');
+  const divFilterValue = (lapDiv && lapDiv.value) ? lapDiv.value : 'all';
 
   let tglMulaiInput, tglAkhirInput, empFilterValue;
 
@@ -5745,7 +5793,7 @@ async function exportRincianExcel(){
   // ── MODE EXPORT SEMUA KARYAWAN ─────────────────────
   if(targetUid === '__ALL__'){
     updateLoader('Membuat Excel Semua Karyawan','Memproses data, mohon tunggu...');
-    return exportRincianExcelSemua(users, absensi, cfg, tglMulai, tglAkhir, periodeStr, periodeShort);
+    return exportRincianExcelSemua(users, absensi, cfg, tglMulai, tglAkhir, periodeStr, periodeShort, divFilterValue);
   }
 
   const targetUser = users[targetUid] || {nama:targetUid,jab:'-',div:'-',id:'-'};
@@ -5886,10 +5934,15 @@ async function exportRincianExcel(){
 // ── Export Excel Rincian SEMUA KARYAWAN — FORMAT FLAT PER TANGGAL ─────
 // Setiap baris = 1 hari kerja 1 karyawan
 // Kolom: TANGGAL | Bulan | Tahun | Nama | NIK | Devisi | JAM MASUK | JAM KELUAR | ISTIRAHAT | JAM KERJA | IDR
-async function exportRincianExcelSemua(users, absensi, cfg, tglMulai, tglAkhir, periodeStr, periodeShort){
-  const karyawan = Object.entries(users).filter(([,u])=>u.role!=='admin');
+async function exportRincianExcelSemua(users, absensi, cfg, tglMulai, tglAkhir, periodeStr, periodeShort, divFilter){
+  let karyawan = Object.entries(users).filter(([,u])=>u.role!=='admin');
+  // Filter berdasarkan divisi kalau dipilih
+  if(divFilter && divFilter !== 'all'){
+    karyawan = karyawan.filter(([,u])=>(u.div||'').trim()===divFilter);
+  }
   if(karyawan.length===0){
-    toast('❗ Belum ada karyawan','er');return;
+    hideLoader();
+    toast(divFilter && divFilter!=='all' ? `❗ Tidak ada karyawan di divisi "${divFilter}"` : '❗ Belum ada karyawan','er');return;
   }
 
   const BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
@@ -6045,8 +6098,8 @@ async function exportRincianExcelSemua(users, absensi, cfg, tglMulai, tglAkhir, 
 
 <!-- TABEL UTAMA FLAT -->
 <table>
-  <tr><td colspan="11" class="title">${cfg.perusahaan||'OWL Absensi'} — Rekap Absensi Harian</td></tr>
-  <tr><td colspan="11" class="sub">📆 Periode: <b>${periodeStr}</b> · Tarif Per Jam: Rp ${fmt(cfg.tarifJam)} · Dicetak: ${tglCetak}</td></tr>
+  <tr><td colspan="11" class="title">${cfg.perusahaan||'OWL Absensi'} — Rekap Absensi Harian${divFilter && divFilter!=='all' ? ' · Divisi: '+divFilter : ''}</td></tr>
+  <tr><td colspan="11" class="sub">📆 Periode: <b>${periodeStr}</b> · Tarif Per Jam: Rp ${fmt(cfg.tarifJam)} · Dicetak: ${tglCetak}${divFilter && divFilter!=='all' ? ' · Divisi: <b>'+divFilter+'</b> ('+karyawan.length+' karyawan)' : ''}</td></tr>
   <tr class="hdr">
     <th>TANGGAL</th>
     <th>Bulan</th>
@@ -6105,7 +6158,8 @@ async function exportRincianExcelSemua(users, absensi, cfg, tglMulai, tglAkhir, 
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'Rekap_Absensi_'+periodeShort+'.xls';
+  const divSuffix = (divFilter && divFilter!=='all') ? '_'+divFilter.replace(/[^a-zA-Z0-9]/g,'') : '';
+  a.download = 'Rekap_Absensi'+divSuffix+'_'+periodeShort+'.xls';
   document.body.appendChild(a);
   a.click();
   setTimeout(()=>{URL.revokeObjectURL(url); a.remove();}, 100);
